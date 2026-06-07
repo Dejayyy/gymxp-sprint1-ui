@@ -1,0 +1,565 @@
+:root {
+  --ink: #15201d;
+  --muted: #66736e;
+  --line: #dce3dd;
+  --paper: #f7f4ee;
+  --surface: #ffffff;
+  --mint: #0f8f72;
+  --mint-soft: #d9f4eb;
+  --coral: #ec6f4c;
+  --amber: #f2b84b;
+  --aqua: #56a8b8;
+  --plum: #6d5a9b;
+  --shadow: 0 22px 48px rgba(23, 34, 30, 0.12);
+  color: var(--ink);
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  background: var(--paper);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background:
+    linear-gradient(180deg, rgba(15, 143, 114, 0.08), transparent 320px),
+    var(--paper);
+}
+
+button,
+a {
+  font: inherit;
+}
+
+.appShell {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 24px 0 42px;
+}
+
+.topbar {
+  display: grid;
+  grid-template-columns: auto minmax(280px, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 28px;
+}
+
+.brand,
+.navTabs a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+
+.brandMark {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border-radius: 8px;
+  color: #ffffff;
+  background: var(--ink);
+  letter-spacing: 0;
+}
+
+.navTabs {
+  display: inline-flex;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.navTabs a {
+  min-width: 78px;
+  padding: 9px 14px;
+  border-radius: 6px;
+  color: var(--muted);
+  text-align: center;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.navTabs .active {
+  color: var(--ink);
+  background: #ffffff;
+  box-shadow: 0 8px 20px rgba(23, 34, 30, 0.09);
+}
+
+.profileChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 44px;
+  padding: 6px 12px 6px 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  font-weight: 700;
+}
+
+.avatar {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 7px;
+  color: #ffffff;
+  background: var(--mint);
+  font-size: 0.75rem;
+}
+
+.dashboard {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(320px, 0.8fr);
+  gap: 22px;
+  align-items: start;
+}
+
+.mainColumn,
+.sideColumn {
+  display: grid;
+  gap: 18px;
+}
+
+.welcome h1 {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 4.7rem);
+  line-height: 0.95;
+  letter-spacing: 0;
+}
+
+.welcome p:last-child {
+  max-width: 690px;
+  margin: 14px 0 4px;
+  color: var(--muted);
+  font-size: 1.05rem;
+  line-height: 1.55;
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  color: var(--mint);
+  font-size: 0.78rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.panel,
+.coachPanel,
+.stat {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 12px 30px rgba(23, 34, 30, 0.07);
+}
+
+.panel {
+  padding: 18px;
+}
+
+.planPanel {
+  padding: 18px;
+  box-shadow: var(--shadow);
+}
+
+.panelHeader,
+.sectionTitle {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.panelHeader h1,
+.sectionTitle h2,
+.coachPanel h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.statusPill,
+.sectionTitle span,
+.tags span {
+  white-space: nowrap;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.statusPill {
+  padding: 8px 10px;
+  color: #205449;
+  background: var(--mint-soft);
+}
+
+.heroMedia {
+  position: relative;
+  overflow: hidden;
+  height: 290px;
+  margin: 16px 0;
+  border-radius: 8px;
+  background: #dfe7e2;
+}
+
+.heroMedia img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.heroOverlay {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  display: grid;
+  gap: 2px;
+  min-width: 150px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  border-radius: 8px;
+  color: #ffffff;
+  background: rgba(21, 32, 29, 0.76);
+  backdrop-filter: blur(8px);
+}
+
+.heroOverlay strong {
+  font-size: 1.5rem;
+}
+
+.heroOverlay span {
+  font-size: 0.86rem;
+}
+
+.planMeta,
+.actionRow,
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.planMeta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  font-weight: 750;
+}
+
+.actionRow {
+  margin-top: 16px;
+}
+
+.primaryBtn,
+.secondaryBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  cursor: default;
+  font-weight: 850;
+}
+
+.primaryBtn {
+  color: #ffffff;
+  background: var(--ink);
+}
+
+.secondaryBtn {
+  color: var(--ink);
+  background: #ffffff;
+  border-color: var(--line);
+}
+
+.workoutList,
+.macroList {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.workoutItem,
+.macroRow,
+.goalMeter {
+  display: grid;
+  align-items: center;
+  gap: 12px;
+}
+
+.workoutItem {
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  min-height: 74px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.stepNumber {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 8px;
+  color: #ffffff;
+  background: var(--mint);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.workoutItem h3 {
+  margin: 0 0 4px;
+  font-size: 1rem;
+}
+
+.workoutItem p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.workoutItem strong {
+  white-space: nowrap;
+  color: var(--ink);
+}
+
+.statStrip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.stat {
+  min-height: 96px;
+  padding: 14px;
+}
+
+.stat span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.stat strong {
+  display: block;
+  margin-top: 12px;
+  font-size: 1.45rem;
+}
+
+.consistency {
+  border-top: 4px solid var(--coral);
+}
+
+.progression {
+  border-top: 4px solid var(--mint);
+}
+
+.recovery {
+  border-top: 4px solid var(--aqua);
+}
+
+.coachPanel {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 12px;
+  padding: 18px;
+  background: #1f2624;
+  color: #ffffff;
+}
+
+.coachIcon {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--amber);
+  color: #21160a;
+}
+
+.coachPanel p {
+  margin: 10px 0 0;
+  color: rgba(255, 255, 255, 0.78);
+  line-height: 1.55;
+}
+
+.sectionTitle span {
+  padding: 6px 9px;
+  color: var(--muted);
+  background: #f2f5f3;
+}
+
+.goalMeter {
+  grid-template-columns: 96px minmax(0, 1fr);
+  margin-top: 18px;
+}
+
+.ring {
+  display: grid;
+  width: 86px;
+  height: 86px;
+  place-items: center;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at center, #ffffff 56%, transparent 58%),
+    conic-gradient(var(--mint) 0 68%, #e9eee9 68% 100%);
+  font-weight: 900;
+}
+
+.goalMeter strong {
+  display: block;
+  font-size: 1.1rem;
+}
+
+.goalMeter p {
+  margin: 7px 0 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.tags {
+  margin-top: 16px;
+}
+
+.tags span {
+  padding: 7px 9px;
+  color: #3b433f;
+  background: #f3f0ea;
+}
+
+.macroRow {
+  grid-template-columns: 12px minmax(0, 1fr) auto;
+  min-height: 54px;
+}
+
+.macroDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.macroDot.protein {
+  background: var(--coral);
+}
+
+.macroDot.carbs {
+  background: var(--amber);
+}
+
+.macroDot.water {
+  background: var(--aqua);
+}
+
+.macroRow strong,
+.macroRow small {
+  display: block;
+}
+
+.macroRow small {
+  margin-top: 3px;
+  color: var(--muted);
+}
+
+.macroRow b {
+  font-size: 1rem;
+}
+
+@media (max-width: 920px) {
+  .appShell {
+    width: min(100% - 24px, 720px);
+  }
+
+  .topbar {
+    grid-template-columns: 1fr auto;
+  }
+
+  .navTabs {
+    grid-column: 1 / -1;
+    justify-content: start;
+    overflow-x: auto;
+  }
+
+  .dashboard {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .appShell {
+    width: min(100% - 18px, 480px);
+    padding-top: 14px;
+  }
+
+  .profileChip {
+    padding-right: 6px;
+  }
+
+  .profileChip span:last-child {
+    display: none;
+  }
+
+  .navTabs a {
+    min-width: 74px;
+    padding-inline: 10px;
+  }
+
+  .welcome h1 {
+    font-size: 2.45rem;
+  }
+
+  .heroMedia {
+    height: 230px;
+  }
+
+  .panelHeader,
+  .sectionTitle {
+    align-items: flex-start;
+  }
+
+  .workoutItem {
+    grid-template-columns: 38px minmax(0, 1fr);
+  }
+
+  .workoutItem strong {
+    grid-column: 2;
+    white-space: normal;
+  }
+
+  .statStrip {
+    grid-template-columns: 1fr;
+  }
+
+  .coachPanel,
+  .goalMeter {
+    grid-template-columns: 1fr;
+  }
+
+  .actionRow button {
+    flex: 1 1 150px;
+  }
+}
