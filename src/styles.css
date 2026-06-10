@@ -35,6 +35,10 @@ a {
   font: inherit;
 }
 
+button {
+  border: 0;
+}
+
 .appShell {
   width: min(1180px, calc(100% - 32px));
   margin: 0 auto;
@@ -50,7 +54,7 @@ a {
 }
 
 .brand,
-.navTabs a {
+.navTabs button {
   color: inherit;
   text-decoration: none;
 }
@@ -61,6 +65,13 @@ a {
   gap: 10px;
   font-size: 1.15rem;
   font-weight: 800;
+}
+
+.brandButton {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: default;
 }
 
 .brandMark {
@@ -84,14 +95,17 @@ a {
   background: rgba(255, 255, 255, 0.72);
 }
 
-.navTabs a {
+.navTabs button {
   min-width: 78px;
   padding: 9px 14px;
+  border: 0;
   border-radius: 6px;
   color: var(--muted);
+  background: transparent;
   text-align: center;
   font-size: 0.92rem;
   font-weight: 700;
+  cursor: default;
 }
 
 .navTabs .active {
@@ -112,6 +126,21 @@ a {
   font-weight: 700;
 }
 
+.loginChip {
+  cursor: default;
+}
+
+.loginChip.active {
+  color: #ffffff;
+  background: var(--ink);
+  border-color: var(--ink);
+}
+
+.loginChip.active .avatar {
+  color: var(--ink);
+  background: #ffffff;
+}
+
 .avatar {
   display: grid;
   width: 32px;
@@ -128,6 +157,203 @@ a {
   grid-template-columns: minmax(0, 1.6fr) minmax(320px, 0.8fr);
   gap: 22px;
   align-items: start;
+}
+
+.loginPage {
+  display: grid;
+  grid-template-columns: minmax(0, 1.18fr) minmax(340px, 0.82fr);
+  gap: 22px;
+  align-items: stretch;
+  min-height: calc(100vh - 136px);
+}
+
+.loginStory {
+  position: relative;
+  overflow: hidden;
+  min-height: 620px;
+  border: 1px solid rgba(21, 32, 29, 0.12);
+  border-radius: 8px;
+  background: #dfe7e2;
+  box-shadow: var(--shadow);
+}
+
+.loginStory::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  background:
+    linear-gradient(90deg, rgba(21, 32, 29, 0.9), rgba(21, 32, 29, 0.24)),
+    linear-gradient(0deg, rgba(21, 32, 29, 0.74), transparent 48%);
+}
+
+.loginStory img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.loginStoryContent {
+  position: absolute;
+  z-index: 1;
+  inset: auto 28px 28px;
+  max-width: 620px;
+  color: #ffffff;
+}
+
+.loginStoryContent .eyebrow {
+  color: #8de4cf;
+}
+
+.loginStoryContent h1 {
+  max-width: 660px;
+  margin: 0;
+  font-size: clamp(2.4rem, 5.8vw, 5.1rem);
+  line-height: 0.94;
+  letter-spacing: 0;
+}
+
+.loginMetrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 26px;
+}
+
+.loginMetrics span {
+  display: grid;
+  gap: 4px;
+  min-height: 86px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.26);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(10px);
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 0.85rem;
+  font-weight: 750;
+}
+
+.loginMetrics strong {
+  color: #ffffff;
+  font-size: 1.55rem;
+}
+
+.loginPanel {
+  align-self: center;
+  display: grid;
+  gap: 16px;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.loginPanelHeader {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 13px;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.loginPanelHeader h2 {
+  margin: 0;
+  font-size: 1.55rem;
+}
+
+.loginIcon {
+  display: grid;
+  width: 54px;
+  height: 54px;
+  place-items: center;
+  border-radius: 8px;
+  color: #ffffff;
+  background: var(--mint);
+}
+
+.fieldGroup {
+  display: grid;
+  gap: 8px;
+  color: var(--ink);
+  font-size: 0.88rem;
+  font-weight: 850;
+}
+
+.inputWrap {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 13px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfa;
+  color: var(--muted);
+}
+
+.inputWrap input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  color: var(--ink);
+  background: transparent;
+  font: inherit;
+}
+
+.inputWrap input::placeholder {
+  color: #9aa49f;
+}
+
+.loginOptions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 750;
+}
+
+.rememberChoice {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.rememberChoice input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--mint);
+}
+
+.textButton,
+.signupPrompt button {
+  padding: 0;
+  color: var(--mint);
+  background: transparent;
+  cursor: default;
+  font-weight: 850;
+}
+
+.loginSubmit,
+.demoButton {
+  width: 100%;
+}
+
+.loginSubmit {
+  margin-top: 2px;
+}
+
+.signupPrompt {
+  margin: 4px 0 0;
+  color: var(--muted);
+  text-align: center;
+  font-size: 0.92rem;
 }
 
 .mainColumn,
@@ -509,6 +735,20 @@ a {
   }
 }
 
+@media (max-width: 980px) {
+  .loginPage {
+    grid-template-columns: 1fr;
+  }
+
+  .loginStory {
+    min-height: 460px;
+  }
+
+  .loginPanel {
+    align-self: stretch;
+  }
+}
+
 @media (max-width: 600px) {
   .appShell {
     width: min(100% - 18px, 480px);
@@ -523,7 +763,7 @@ a {
     display: none;
   }
 
-  .navTabs a {
+  .navTabs button {
     min-width: 74px;
     padding-inline: 10px;
   }
@@ -561,5 +801,30 @@ a {
 
   .actionRow button {
     flex: 1 1 150px;
+  }
+
+  .loginPage {
+    gap: 14px;
+  }
+
+  .loginStory {
+    min-height: 520px;
+  }
+
+  .loginStoryContent {
+    inset: auto 18px 18px;
+  }
+
+  .loginMetrics {
+    grid-template-columns: 1fr;
+  }
+
+  .loginPanel {
+    padding: 18px;
+  }
+
+  .loginOptions {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }

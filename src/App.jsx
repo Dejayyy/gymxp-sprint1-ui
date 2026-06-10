@@ -1,5 +1,11 @@
+import { useState } from "react";
 import {
   Activity,
+  ArrowRight,
+  BrainCircuit,
+  Dumbbell,
+  LockKeyhole,
+  Mail,
   Play,
   ShieldCheck,
   SlidersHorizontal,
@@ -26,27 +32,37 @@ const goals = [
   ["Sleep score", "78", "recovery"],
 ];
 
-function Header() {
+function Header({ activeView, onShowHome, onShowLogin }) {
   return (
     <header className="topbar">
-      <a className="brand" href="#">
+     <button className="brand brandButton" type="button" onClick={onShowHome}>
         <span className="brandMark">GX</span>
         <span>GymXP</span>
-      </a>
+      </button>
 
       <nav className="navTabs" aria-label="Main navigation">
-        <a className="active" href="#">
+         <button
+          className={activeView === "home" ? "active" : ""}
+          type="button"
+          onClick={onShowHome}
+        >
           Today
-        </a>
-        <a href="#">Progress</a>
-        <a href="#">Nutrition</a>
-        <a href="#">Profile</a>
+        </button>
+        <button type="button">Progress</button>
+        <button type="button">Nutrition</button>
+        <button type="button">Profile</button>
       </nav>
 
-      <div className="profileChip">
-        <span className="avatar">WM</span>
-        <span>Beginner</span>
-      </div>
+      <button
+        className={`profileChip loginChip ${
+          activeView === "login" ? "active" : ""
+        }`}
+        type="button"
+        onClick={onShowLogin}
+      >
+        <span className="avatar">GX</span>
+        <span>Sign in</span>
+      </button>
     </header>
   );
 }
@@ -204,33 +220,132 @@ function ProfilePanel() {
   );
 }
 
-function App() {
+function LoginPage({ onShowHome }) {
   return (
-    <main className="appShell">
-      <Header />
-
-      <div className="dashboard">
-        <div className="mainColumn">
-          <div className="welcome">
-            <p className="eyebrow">Sprint 1 Demo</p>
-            <h1>Good morning, William</h1>
-            <p>
-              Your plan is balanced around goals, equipment, recovery, and
-              recent workout feedback.
-            </p>
+    <section className="loginPage" aria-label="GymXP sign in">
+      <div className="loginStory">
+        <img
+          src="https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&w=1200&q=80"
+          alt="Athlete training with battle ropes"
+        />
+        <div className="loginStoryContent">
+          <p className="eyebrow">AI workout intelligence</p>
+          <h1>Train with a plan that adapts before you stall.</h1>
+          <div className="loginMetrics" aria-label="Training highlights">
+            <span>
+              <strong>45m</strong>
+              Smart session
+            </span>
+            <span>
+              <strong>+8%</strong>
+              Weekly volume
+            </span>
+            <span>
+              <strong>78</strong>
+              Recovery score
+            </span>
           </div>
+        </div>
+      </div>
 
-          <TodayPlan />
-          <WorkoutList />
+      <form className="loginPanel" onSubmit={(event) => event.preventDefault()}>
+        <div className="loginPanelHeader">
+          <span className="loginIcon">
+            <BrainCircuit size={24} />
+          </span>
+          <div>
+            <p className="eyebrow">Welcome back</p>
+            <h2>Sign in to GymXP</h2>
+          </div>
         </div>
 
-        <aside className="sideColumn">
-          <StatStrip />
-          <CoachNote />
-          <ProfilePanel />
-          <NutritionPanel />
-        </aside>
-      </div>
+        <label className="fieldGroup">
+          <span>Email</span>
+          <span className="inputWrap">
+            <Mail size={18} />
+            <input type="email" placeholder="you@example.com" />
+          </span>
+        </label>
+
+        <label className="fieldGroup">
+          <span>Password</span>
+          <span className="inputWrap">
+            <LockKeyhole size={18} />
+            <input type="password" placeholder="Enter password" />
+          </span>
+        </label>
+
+        <div className="loginOptions">
+          <label className="rememberChoice">
+            <input type="checkbox" />
+            <span>Remember me</span>
+          </label>
+          <button className="textButton" type="button">
+            Forgot password
+          </button>
+        </div>
+
+        <button className="primaryBtn loginSubmit" type="button">
+          <span>Sign in</span>
+          <ArrowRight size={18} />
+        </button>
+
+        <button
+          className="secondaryBtn demoButton"
+          type="button"
+          onClick={onShowHome}
+        >
+          <Dumbbell size={18} />
+          <span>View demo dashboard</span>
+        </button>
+
+        <p className="signupPrompt">
+          New to GymXP? <button type="button">Create an account</button>
+        </p>
+      </form>
+    </section>
+  );
+}
+
+function App() {
+  const [activeView, setActiveView] = useState("home");
+  const showHome = () => setActiveView("home");
+  const showLogin = () => setActiveView("login");
+
+  return (
+    <main className="appShell">
+      <Header
+        activeView={activeView}
+        onShowHome={showHome}
+        onShowLogin={showLogin}
+      />
+
+      {activeView === "login" ? (
+        <LoginPage onShowHome={showHome} />
+      ) : (
+        <div className="dashboard">
+          <div className="mainColumn">
+            <div className="welcome">
+              <p className="eyebrow">Sprint 1 Demo</p>
+              <h1>Good morning, William</h1>
+              <p>
+                Your plan is balanced around goals, equipment, recovery, and
+                recent workout feedback.
+              </p>
+            </div>
+
+            <TodayPlan />
+            <WorkoutList />
+          </div>
+
+          <aside className="sideColumn">
+            <StatStrip />
+            <CoachNote />
+            <ProfilePanel />
+            <NutritionPanel />
+          </aside>
+        </div>
+      )}
     </main>
   );
 }
