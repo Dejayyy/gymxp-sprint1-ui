@@ -1,5 +1,7 @@
 import { useState } from "react";
 import AuthPage from "./AuthPage";
+import ProfilePage from "./ProfilePage";
+import NutritionPage from "./NutritionPage";
 
 import {
   Activity,
@@ -34,7 +36,7 @@ const goals = [
   ["Sleep score", "78", "recovery"],
 ];
 
-function Header({ activeView, onShowHome, onShowLogin }) {
+function Header({ activeView, onShowHome, onShowLogin, onShowProfile, onShowNutrition }) {
   return (
     <header className="topbar">
      <button className="brand brandButton" type="button" onClick={onShowHome}>
@@ -51,8 +53,20 @@ function Header({ activeView, onShowHome, onShowLogin }) {
           Today
         </button>
         <button type="button">Progress</button>
-        <button type="button">Nutrition</button>
-        <button type="button">Profile</button>
+        <button
+          className={activeView === "nutrition" ? "active" : ""}
+          type="button"
+          onClick={onShowNutrition}
+        >
+          Nutrition
+        </button>
+        <button
+          className={activeView === "profile" ? "active" : ""}
+          type="button"
+          onClick={onShowProfile}
+        >
+          Profile
+        </button>
       </nav>
 
       <button
@@ -194,12 +208,14 @@ function NutritionPanel() {
   );
 }
 
-function ProfilePanel() {
+function ProfilePanel({ onShowProfile }) {
   return (
     <section className="panel profilePanel">
       <div className="sectionTitle">
         <h2>Goal profile</h2>
-        <span>Active</span>
+        <button className="textButton" type="button" onClick={onShowProfile}>
+          Edit
+        </button>
       </div>
 
       <div className="goalMeter">
@@ -368,6 +384,8 @@ function App() {
   const [activeView, setActiveView] = useState("home");
   const showHome = () => setActiveView("home");
   const showLogin = () => setActiveView("login");
+  const showProfile = () => setActiveView("profile");
+  const showNutrition = () => setActiveView("nutrition");
 
   return (
     <main className="appShell">
@@ -375,11 +393,17 @@ function App() {
         activeView={activeView}
         onShowHome={showHome}
         onShowLogin={showLogin}
+        onShowProfile={showProfile}
+        onShowNutrition={showNutrition}
       />
 
       {activeView === "login" ? (
         // changes to link to AuthPage.jsx, which has the login form and logic, instead of the Home dashboard  
         <AuthPage onShowHome={showHome} />
+      ) : activeView === "profile" ? (
+        <ProfilePage onShowLogin={showLogin} />
+      ) : activeView === "nutrition" ? (
+        <NutritionPage onShowLogin={showLogin} />
       ) : (
         <div className="dashboard">
           <div className="mainColumn">
@@ -399,7 +423,7 @@ function App() {
           <aside className="sideColumn">
             <StatStrip />
             <CoachNote />
-            <ProfilePanel />
+            <ProfilePanel onShowProfile={showProfile} />
             <NutritionPanel />
           </aside>
         </div>

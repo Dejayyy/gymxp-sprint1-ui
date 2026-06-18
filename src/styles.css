@@ -828,3 +828,254 @@ button {
     flex-direction: column;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Profile & preferences page
+--------------------------------------------------------------------------- */
+.profilePage {
+  display: grid;
+  gap: 22px;
+  align-items: start;
+}
+
+.profileSection {
+  margin-bottom: 16px;
+}
+
+.profileGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.profileWide {
+  margin-top: 16px;
+}
+
+/* Make selects match the text inputs */
+.inputWrap select {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  color: var(--ink);
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 18px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2366736e' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right center;
+}
+
+.inputWrap--readonly {
+  background: #f1f3f0;
+}
+
+.inputWrap--readonly input {
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+/* Textarea variant: icon pinned to the top */
+.inputWrap--textarea {
+  align-items: start;
+  min-height: 0;
+  padding-top: 13px;
+  padding-bottom: 13px;
+}
+
+.inputWrap--textarea svg {
+  margin-top: 2px;
+}
+
+.inputWrap textarea {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  resize: vertical;
+  color: var(--ink);
+  background: transparent;
+  font: inherit;
+  line-height: 1.5;
+}
+
+.inputWrap textarea::placeholder {
+  color: #9aa49f;
+}
+
+/* Inline form alerts */
+.formAlert {
+  padding: 10px 12px;
+  border-radius: 8px;
+  margin-bottom: 4px;
+  font-size: 0.88rem;
+  font-weight: 750;
+}
+
+.formAlert--error {
+  color: #a3271a;
+  background: #fdeae6;
+}
+
+.formAlert--success {
+  color: #205449;
+  background: var(--mint-soft);
+}
+
+/* Loading / signed-out states */
+.profileLoading {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 750;
+}
+
+.profileEmpty {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 40px 24px;
+  text-align: center;
+}
+
+.profileEmpty h2 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.profileEmpty p {
+  max-width: 420px;
+  margin: 0 0 6px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+@media (max-width: 600px) {
+  .profileGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Allergy chips on the profile page (selected = excluded from plans) */
+.chipGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  padding: 7px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.chip--on {
+  color: #a3271a;
+  background: #fdeae6;
+  border-color: #f3b7ab;
+}
+
+/* Nutrition plan page */
+.nutritionPage {
+  display: grid;
+  gap: 18px;
+  align-items: start;
+}
+
+.targetGrid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.mealCard {
+  padding: 18px;
+}
+
+.mealHead {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.mealHead h3 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.mealKcal {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  padding: 6px 10px;
+  border-radius: 999px;
+  color: #205449;
+  background: var(--mint-soft);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.mealDesc {
+  margin: 8px 0 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.mealItems {
+  display: grid;
+  gap: 6px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mealItems li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.mealItems li:last-child {
+  border-bottom: 0;
+}
+
+.mealItems strong {
+  white-space: nowrap;
+  color: var(--ink);
+}
+
+.mealMacros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.mealMacros span {
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+@media (max-width: 600px) {
+  .targetGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

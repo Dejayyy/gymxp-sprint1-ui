@@ -1,7 +1,10 @@
+node_modules/
+dist/
+*.local
+
 *.db
 __pycache__/
 *.pyc
 .venv/
 venv/
 env/
-.env
