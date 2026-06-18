@@ -9,7 +9,15 @@ import {
   Activity,
   Dumbbell,
   ShieldCheck,
-  Apple,
+  Salad,
+  PieChart,
+  AlertTriangle,
+  Ban,
+  Heart,
+  Utensils,
+  Flame,
+  MessageSquare,
+  Plus,
   Save,
   LogIn,
 } from "lucide-react";
@@ -20,6 +28,14 @@ const GOAL_OPTIONS = ["Lean muscle", "Build strength", "Lose weight", "Improve e
 const EXPERIENCE_OPTIONS = ["Beginner", "Intermediate", "Advanced"];
 const EQUIPMENT_OPTIONS = ["Home only", "Gym only", "Home + gym"];
 const SESSION_OPTIONS = [30, 45, 60, 75, 90];
+
+const DIET_PATTERNS = [
+  "Omnivore", "Vegetarian", "Vegan", "Pescatarian", "Keto",
+  "Paleo", "Mediterranean", "Halal", "Kosher", "Other",
+];
+const MACRO_FOCUS = ["Balanced", "High protein", "Low carb", "High carb", "Custom"];
+const MEALS_PER_DAY = ["3", "4", "5", "Intermittent fasting"];
+const COMMON_ALLERGENS = ["Nuts", "Dairy", "Gluten", "Shellfish", "Eggs", "Soy", "Fish"];
 
 // Keeps numeric inputs controlled without throwing NaN into React state.
 function toNumberOrNull(value) {
@@ -32,6 +48,7 @@ function ProfilePage({ onShowLogin }) {
   const [form, setForm] = useState(null);
   const [status, setStatus] = useState("loading"); // loading | ready | unauthenticated | error
   const [saving, setSaving] = useState(false);
+  const [customAllergen, setCustomAllergen] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
@@ -53,7 +70,6 @@ function ProfilePage({ onShowLogin }) {
           setStatus("unauthenticated");
           return;
         }
-
         if (!response.ok) {
           setStatus("error");
           setErrorMessage("We couldn't load your profile. Try again in a moment.");
@@ -72,6 +88,27 @@ function ProfilePage({ onShowLogin }) {
 
   const updateField = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
+    setSuccessMessage("");
+  };
+
+  const toggleAllergen = (name) => {
+    setForm((prev) => {
+      const set = new Set(prev.allergies || []);
+      set.has(name) ? set.delete(name) : set.add(name);
+      return { ...prev, allergies: [...set] };
+    });
+    setSuccessMessage("");
+  };
+
+  const addCustomAllergen = () => {
+    const value = customAllergen.trim();
+    if (!value) return;
+    setForm((prev) => {
+      const set = new Set(prev.allergies || []);
+      set.add(value);
+      return { ...prev, allergies: [...set] };
+    });
+    setCustomAllergen("");
     setSuccessMessage("");
   };
 
@@ -97,6 +134,8 @@ function ProfilePage({ onShowLogin }) {
       weight_kg: toNumberOrNull(editable.weight_kg),
       session_length: toNumberOrNull(editable.session_length),
       days_per_week: toNumberOrNull(editable.days_per_week),
+      daily_calorie_target: toNumberOrNull(editable.daily_calorie_target),
+      allergies: editable.allergies || [],
     };
 
     try {
@@ -116,7 +155,6 @@ function ProfilePage({ onShowLogin }) {
       }
 
       const data = await response.json();
-
       if (response.ok) {
         setForm(data);
         setSuccessMessage("Profile saved.");
@@ -163,6 +201,9 @@ function ProfilePage({ onShowLogin }) {
     );
   }
 
+  // All allergens to show as chips: the common set plus any custom ones added.
+  const allergenChips = Array.from(new Set([...COMMON_ALLERGENS, ...(form.allergies || [])]));
+
   return (
     <form className="profilePage" onSubmit={handleSave}>
       <section className="panel">
@@ -186,12 +227,8 @@ function ProfilePage({ onShowLogin }) {
             <span>Display name</span>
             <span className="inputWrap">
               <User size={18} />
-              <input
-                type="text"
-                placeholder="What should we call you?"
-                value={form.display_name ?? ""}
-                onChange={(e) => updateField("display_name", e.target.value)}
-              />
+              <input type="text" placeholder="What should we call you?"
+                value={form.display_name ?? ""} onChange={(e) => updateField("display_name", e.target.value)} />
             </span>
           </label>
 
@@ -207,13 +244,8 @@ function ProfilePage({ onShowLogin }) {
             <span>Age</span>
             <span className="inputWrap">
               <CalendarClock size={18} />
-              <input
-                type="number"
-                min="0"
-                placeholder="Years"
-                value={form.age ?? ""}
-                onChange={(e) => updateField("age", e.target.value)}
-              />
+              <input type="number" min="0" placeholder="Years"
+                value={form.age ?? ""} onChange={(e) => updateField("age", e.target.value)} />
             </span>
           </label>
 
@@ -221,13 +253,8 @@ function ProfilePage({ onShowLogin }) {
             <span>Height (cm)</span>
             <span className="inputWrap">
               <Ruler size={18} />
-              <input
-                type="number"
-                min="0"
-                placeholder="cm"
-                value={form.height_cm ?? ""}
-                onChange={(e) => updateField("height_cm", e.target.value)}
-              />
+              <input type="number" min="0" placeholder="cm"
+                value={form.height_cm ?? ""} onChange={(e) => updateField("height_cm", e.target.value)} />
             </span>
           </label>
 
@@ -235,14 +262,8 @@ function ProfilePage({ onShowLogin }) {
             <span>Weight (kg)</span>
             <span className="inputWrap">
               <Scale size={18} />
-              <input
-                type="number"
-                min="0"
-                step="0.1"
-                placeholder="kg"
-                value={form.weight_kg ?? ""}
-                onChange={(e) => updateField("weight_kg", e.target.value)}
-              />
+              <input type="number" min="0" step="0.1" placeholder="kg"
+                value={form.weight_kg ?? ""} onChange={(e) => updateField("weight_kg", e.target.value)} />
             </span>
           </label>
         </div>
@@ -251,7 +272,7 @@ function ProfilePage({ onShowLogin }) {
       <section className="panel">
         <div className="sectionTitle profileSection">
           <h2>Training preferences</h2>
-          <span>Used to shape your plan</span>
+          <span>Shapes your workouts</span>
         </div>
 
         <div className="profileGrid">
@@ -260,9 +281,7 @@ function ProfilePage({ onShowLogin }) {
             <span className="inputWrap">
               <Target size={18} />
               <select value={form.goal ?? ""} onChange={(e) => updateField("goal", e.target.value)}>
-                {GOAL_OPTIONS.map((option) => (
-                  <option key={option} value={option}>{option}</option>
-                ))}
+                {GOAL_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
               </select>
             </span>
           </label>
@@ -272,9 +291,7 @@ function ProfilePage({ onShowLogin }) {
             <span className="inputWrap">
               <Activity size={18} />
               <select value={form.experience ?? ""} onChange={(e) => updateField("experience", e.target.value)}>
-                {EXPERIENCE_OPTIONS.map((option) => (
-                  <option key={option} value={option}>{option}</option>
-                ))}
+                {EXPERIENCE_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
               </select>
             </span>
           </label>
@@ -284,9 +301,7 @@ function ProfilePage({ onShowLogin }) {
             <span className="inputWrap">
               <Dumbbell size={18} />
               <select value={form.equipment ?? ""} onChange={(e) => updateField("equipment", e.target.value)}>
-                {EQUIPMENT_OPTIONS.map((option) => (
-                  <option key={option} value={option}>{option}</option>
-                ))}
+                {EQUIPMENT_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
               </select>
             </span>
           </label>
@@ -295,13 +310,8 @@ function ProfilePage({ onShowLogin }) {
             <span>Session length (min)</span>
             <span className="inputWrap">
               <CalendarClock size={18} />
-              <select
-                value={form.session_length ?? ""}
-                onChange={(e) => updateField("session_length", e.target.value)}
-              >
-                {SESSION_OPTIONS.map((option) => (
-                  <option key={option} value={option}>{option} min</option>
-                ))}
+              <select value={form.session_length ?? ""} onChange={(e) => updateField("session_length", e.target.value)}>
+                {SESSION_OPTIONS.map((o) => <option key={o} value={o}>{o} min</option>)}
               </select>
             </span>
           </label>
@@ -310,27 +320,8 @@ function ProfilePage({ onShowLogin }) {
             <span>Workouts per week</span>
             <span className="inputWrap">
               <Activity size={18} />
-              <input
-                type="number"
-                min="1"
-                max="7"
-                placeholder="Days"
-                value={form.days_per_week ?? ""}
-                onChange={(e) => updateField("days_per_week", e.target.value)}
-              />
-            </span>
-          </label>
-
-          <label className="fieldGroup">
-            <span>Diet preference</span>
-            <span className="inputWrap">
-              <Apple size={18} />
-              <input
-                type="text"
-                placeholder="e.g. High protein"
-                value={form.diet_pref ?? ""}
-                onChange={(e) => updateField("diet_pref", e.target.value)}
-              />
+              <input type="number" min="1" max="7" placeholder="Days"
+                value={form.days_per_week ?? ""} onChange={(e) => updateField("days_per_week", e.target.value)} />
             </span>
           </label>
         </div>
@@ -339,12 +330,113 @@ function ProfilePage({ onShowLogin }) {
           <span>Injuries or movements to avoid</span>
           <span className="inputWrap inputWrap--textarea">
             <ShieldCheck size={18} />
-            <textarea
-              rows={3}
-              placeholder="e.g. Avoid high-impact knee movements"
-              value={form.constraints ?? ""}
-              onChange={(e) => updateField("constraints", e.target.value)}
-            />
+            <textarea rows={2} placeholder="e.g. Avoid high-impact knee movements"
+              value={form.constraints ?? ""} onChange={(e) => updateField("constraints", e.target.value)} />
+          </span>
+        </label>
+      </section>
+
+      <section className="panel">
+        <div className="sectionTitle profileSection">
+          <h2>Dietary preferences</h2>
+          <span>Feeds your nutrition plan</span>
+        </div>
+
+        {/* Allergies are a hard constraint — the plan never includes them. */}
+        <label className="fieldGroup profileWide">
+          <span>
+            <AlertTriangle size={14} style={{ verticalAlign: "-2px", marginRight: 6 }} />
+            Allergies &amp; intolerances — never included in your plan
+          </span>
+          <div className="chipGroup">
+            {allergenChips.map((name) => {
+              const on = (form.allergies || []).includes(name);
+              return (
+                <button key={name} type="button"
+                  className={`chip ${on ? "chip--on" : ""}`}
+                  aria-pressed={on}
+                  onClick={() => toggleAllergen(name)}>
+                  {name}
+                </button>
+              );
+            })}
+          </div>
+          <span className="inputWrap" style={{ marginTop: 10 }}>
+            <Plus size={18} />
+            <input type="text" placeholder="Add another, then press Enter"
+              value={customAllergen}
+              onChange={(e) => setCustomAllergen(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") { e.preventDefault(); addCustomAllergen(); }
+              }} />
+          </span>
+        </label>
+
+        <div className="profileGrid">
+          <label className="fieldGroup">
+            <span>Diet pattern</span>
+            <span className="inputWrap">
+              <Salad size={18} />
+              <select value={form.diet_pattern ?? ""} onChange={(e) => updateField("diet_pattern", e.target.value)}>
+                {DIET_PATTERNS.map((o) => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </span>
+          </label>
+
+          <label className="fieldGroup">
+            <span>Macro focus</span>
+            <span className="inputWrap">
+              <PieChart size={18} />
+              <select value={form.macro_focus ?? ""} onChange={(e) => updateField("macro_focus", e.target.value)}>
+                {MACRO_FOCUS.map((o) => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </span>
+          </label>
+
+          <label className="fieldGroup">
+            <span>Meals per day</span>
+            <span className="inputWrap">
+              <Utensils size={18} />
+              <select value={form.meals_per_day ?? ""} onChange={(e) => updateField("meals_per_day", e.target.value)}>
+                {MEALS_PER_DAY.map((o) => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </span>
+          </label>
+
+          <label className="fieldGroup">
+            <span>Daily calorie target (optional)</span>
+            <span className="inputWrap">
+              <Flame size={18} />
+              <input type="number" min="0" placeholder="Leave blank to auto-calculate"
+                value={form.daily_calorie_target ?? ""} onChange={(e) => updateField("daily_calorie_target", e.target.value)} />
+            </span>
+          </label>
+
+          <label className="fieldGroup">
+            <span>Foods you dislike</span>
+            <span className="inputWrap">
+              <Ban size={18} />
+              <input type="text" placeholder="e.g. mushrooms, tofu"
+                value={form.disliked_foods ?? ""} onChange={(e) => updateField("disliked_foods", e.target.value)} />
+            </span>
+          </label>
+
+          <label className="fieldGroup">
+            <span>Foods you love</span>
+            <span className="inputWrap">
+              <Heart size={18} />
+              <input type="text" placeholder="e.g. salmon, oats, berries"
+                value={form.favorite_foods ?? ""} onChange={(e) => updateField("favorite_foods", e.target.value)} />
+            </span>
+          </label>
+        </div>
+
+        <label className="fieldGroup profileWide">
+          <span>Anything else your coach should know</span>
+          <span className="inputWrap inputWrap--textarea">
+            <MessageSquare size={18} />
+            <textarea rows={3} placeholder="e.g. Lactose intolerant but fine with hard cheese; I travel on Tuesdays"
+              value={form.nutrition_notes ?? ""} onChange={(e) => updateField("nutrition_notes", e.target.value)} />
           </span>
         </label>
 

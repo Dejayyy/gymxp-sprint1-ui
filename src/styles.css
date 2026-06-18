@@ -831,7 +831,6 @@ button {
 
 /* ---------------------------------------------------------------------------
    Profile & preferences page
-   Reuses panel / fieldGroup / inputWrap vocabulary from the rest of the app.
 --------------------------------------------------------------------------- */
 .profilePage {
   display: grid;
@@ -853,7 +852,7 @@ button {
   margin-top: 16px;
 }
 
-/* Selects should read exactly like the text inputs inside .inputWrap */
+/* Make selects match the text inputs */
 .inputWrap select {
   width: 100%;
   min-width: 0;
@@ -880,7 +879,7 @@ button {
   cursor: not-allowed;
 }
 
-/* Textarea variant: let the box grow and keep the icon pinned to the top */
+/* Textarea variant: icon pinned to the top */
 .inputWrap--textarea {
   align-items: start;
   min-height: 0;
@@ -908,7 +907,7 @@ button {
   color: #9aa49f;
 }
 
-/* Shared inline alerts (replaces the per-field inline styles in AuthPage) */
+/* Inline form alerts */
 .formAlert {
   padding: 10px 12px;
   border-radius: 8px;
@@ -957,5 +956,126 @@ button {
 @media (max-width: 600px) {
   .profileGrid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Allergy chips on the profile page (selected = excluded from plans) */
+.chipGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  padding: 7px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.chip--on {
+  color: #a3271a;
+  background: #fdeae6;
+  border-color: #f3b7ab;
+}
+
+/* Nutrition plan page */
+.nutritionPage {
+  display: grid;
+  gap: 18px;
+  align-items: start;
+}
+
+.targetGrid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.mealCard {
+  padding: 18px;
+}
+
+.mealHead {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.mealHead h3 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.mealKcal {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  padding: 6px 10px;
+  border-radius: 999px;
+  color: #205449;
+  background: var(--mint-soft);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.mealDesc {
+  margin: 8px 0 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.mealItems {
+  display: grid;
+  gap: 6px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mealItems li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.mealItems li:last-child {
+  border-bottom: 0;
+}
+
+.mealItems strong {
+  white-space: nowrap;
+  color: var(--ink);
+}
+
+.mealMacros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.mealMacros span {
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+@media (max-width: 600px) {
+  .targetGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

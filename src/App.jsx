@@ -1,6 +1,7 @@
 import { useState } from "react";
 import AuthPage from "./AuthPage";
 import ProfilePage from "./ProfilePage";
+import NutritionPage from "./NutritionPage";
 
 import {
   Activity,
@@ -35,7 +36,7 @@ const goals = [
   ["Sleep score", "78", "recovery"],
 ];
 
-function Header({ activeView, onShowHome, onShowLogin, onShowProfile }) {
+function Header({ activeView, onShowHome, onShowLogin, onShowProfile, onShowNutrition }) {
   return (
     <header className="topbar">
      <button className="brand brandButton" type="button" onClick={onShowHome}>
@@ -52,7 +53,13 @@ function Header({ activeView, onShowHome, onShowLogin, onShowProfile }) {
           Today
         </button>
         <button type="button">Progress</button>
-        <button type="button">Nutrition</button>
+        <button
+          className={activeView === "nutrition" ? "active" : ""}
+          type="button"
+          onClick={onShowNutrition}
+        >
+          Nutrition
+        </button>
         <button
           className={activeView === "profile" ? "active" : ""}
           type="button"
@@ -231,44 +238,154 @@ function ProfilePanel({ onShowProfile }) {
   );
 }
 
+// function LoginPage({ onShowHome }) {
+//   // 1. Create states to hold the text the user types in
+//   const [email, setEmail] = useState('');
+//   const [password, setPassword] = useState('');
+//   const [errorMessage, setErrorMessage] = useState('');
+
+//   // 2. The function that triggers when the user clicks "Sign In"
+//   const handleLoginSubmit = async (event) => {
+//     event.preventDefault(); // Stop the page from refreshing
+//     setErrorMessage('');    // Clear any old errors
+
+//     // FastAPI's OAuth2 system expects data formatted as standard Form Data
+//     const formData = new FormData();
+//     formData.append('username', email); // We pass the email string as the "username" parameter
+//     formData.append('password', password);
+
+//     try {
+//       // Send the POST request to your running backend
+//       const response = await fetch('http://localhost:8000/login', {
+//         method: 'POST',
+//         body: formData,
+//       });
+
+//       const data = await response.json();
+
+//       if (response.ok) {
+//         // Success! Save the secure token to the browser storage
+//         localStorage.setItem('userToken', data.access_token);
+        
+//         // Use the prop William built to instantly switch the screen to the Home Dashboard!
+//         onShowHome(); 
+//       } else {
+//         // If your backend throws a 401 (Invalid credentials), show it on screen
+//         setErrorMessage(data.detail || 'Login failed. Please try again.');
+//       }
+//     } catch (error) {
+//       setErrorMessage('Cannot reach backend server. Make sure Uvicorn is running!');
+//     }
+//   };
+//   return (
+//     <section className="loginPage" aria-label="GymXP sign in">
+//       <div className="loginStory">
+//         <img
+//           src="https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&w=1200&q=80"
+//           alt="Athlete training with battle ropes"
+//         />
+//         <div className="loginStoryContent">
+//           <p className="eyebrow">AI workout intelligence</p>
+//           <h1>Train with a plan that adapts before you stall.</h1>
+//           <div className="loginMetrics" aria-label="Training highlights">
+//             <span>
+//               <strong>45m</strong>
+//               Smart session
+//             </span>
+//             <span>
+//               <strong>+8%</strong>
+//               Weekly volume
+//             </span>
+//             <span>
+//               <strong>78</strong>
+//               Recovery score
+//             </span>
+//           </div>
+//         </div>
+//       </div>
+
+
+// {/* 3. Link the form submission directly to our new function */}
+//       <form className="loginPanel" onSubmit={handleLoginSubmit}>
+//         <div className="loginPanelHeader">
+//           <span className="loginIcon">
+//             <BrainCircuit size={24} />
+//           </span>
+//           <div>
+//             <p className="eyebrow">Welcome back</p>
+//             <h2>Sign in to GymXP</h2>
+//           </div>
+//         </div>
+
+//         <label className="fieldGroup">
+//           <span>Email</span>
+//           <span className="inputWrap">
+//             <Mail size={18} />
+//             {/* 4. Connect the email input to React state */}
+//             <input 
+//               type="email" 
+//               placeholder="you@example.com" 
+//               value={email}
+//               onChange={(e) => setEmail(e.target.value)}
+//               required
+//             />
+//           </span>
+//         </label>
+
+//         <label className="fieldGroup">
+//           <span>Password</span>
+//           <span className="inputWrap">
+//             <LockKeyhole size={18} />
+//             {/* 5. Connect the password input to React state */}
+//             <input 
+//               type="password" 
+//               placeholder="Enter password" 
+//               value={password}
+//               onChange={(e) => setPassword(e.target.value)}
+//               required
+//             />
+//           </span>
+//         </label>
+
+//         <div className="loginOptions">
+//           <label className="rememberChoice">
+//             <input type="checkbox" />
+//             <span>Remember me</span>
+//           </label>
+//           <button className="textButton" type="button">
+//             Forgot password
+//           </button>
+//         </div>
+
+//         {/* 6. Changed type from "button" to "submit" so hitting enter or clicking triggers the form submission */}
+//         <button className="primaryBtn loginSubmit" type="submit">
+//           <span>Sign in</span>
+//           <ArrowRight size={18} />
+//         </button>
+
+//         <button
+//           className="secondaryBtn demoButton"
+//           type="button"
+//           onClick={onShowHome}
+//         >
+//           <Dumbbell size={18} />
+//           <span>View demo dashboard</span>
+//         </button>
+
+//         <p className="signupPrompt">
+//           New to GymXP? <button type="button">Create an account</button>
+//         </p>
+//       </form>
+//     </section>
+//   );
+// }
+
 function App() {
   const [activeView, setActiveView] = useState("home");
   const showHome = () => setActiveView("home");
   const showLogin = () => setActiveView("login");
   const showProfile = () => setActiveView("profile");
-
-  let mainContent;
-  if (activeView === "login") {
-    // Links to AuthPage.jsx, which holds the login form and logic.
-    mainContent = <AuthPage onShowHome={showHome} />;
-  } else if (activeView === "profile") {
-    mainContent = <ProfilePage onShowLogin={showLogin} />;
-  } else {
-    mainContent = (
-      <div className="dashboard">
-        <div className="mainColumn">
-          <div className="welcome">
-            <p className="eyebrow">Sprint 1 Demo</p>
-            <h1>Good morning, William</h1>
-            <p>
-              Your plan is balanced around goals, equipment, recovery, and
-              recent workout feedback.
-            </p>
-          </div>
-
-          <TodayPlan />
-          <WorkoutList />
-        </div>
-
-        <aside className="sideColumn">
-          <StatStrip />
-          <CoachNote />
-          <ProfilePanel onShowProfile={showProfile} />
-          <NutritionPanel />
-        </aside>
-      </div>
-    );
-  }
+  const showNutrition = () => setActiveView("nutrition");
 
   return (
     <main className="appShell">
@@ -277,8 +394,40 @@ function App() {
         onShowHome={showHome}
         onShowLogin={showLogin}
         onShowProfile={showProfile}
+        onShowNutrition={showNutrition}
       />
-      {mainContent}
+
+      {activeView === "login" ? (
+        // changes to link to AuthPage.jsx, which has the login form and logic, instead of the Home dashboard  
+        <AuthPage onShowHome={showHome} />
+      ) : activeView === "profile" ? (
+        <ProfilePage onShowLogin={showLogin} />
+      ) : activeView === "nutrition" ? (
+        <NutritionPage onShowLogin={showLogin} />
+      ) : (
+        <div className="dashboard">
+          <div className="mainColumn">
+            <div className="welcome">
+              <p className="eyebrow">Sprint 1 Demo</p>
+              <h1>Good morning, William</h1>
+              <p>
+                Your plan is balanced around goals, equipment, recovery, and
+                recent workout feedback.
+              </p>
+            </div>
+
+            <TodayPlan />
+            <WorkoutList />
+          </div>
+
+          <aside className="sideColumn">
+            <StatStrip />
+            <CoachNote />
+            <ProfilePanel onShowProfile={showProfile} />
+            <NutritionPanel />
+          </aside>
+        </div>
+      )}
     </main>
   );
 }
