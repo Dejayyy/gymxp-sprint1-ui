@@ -2,6 +2,7 @@ import { useState } from "react";
 import AuthPage from "./AuthPage";
 import ProfilePage from "./ProfilePage";
 import NutritionPage from "./NutritionPage";
+import AIChatbot from "./AIChatbot";
 
 import {
   Activity,
@@ -428,6 +429,8 @@ function App() {
           </aside>
         </div>
       )}
+      {/* ai chatbox linked to the App.jsx file so it appears on every page of the app, not just the home dashboard  */}
+      <AIChatbot />
     </main>
   );
 }

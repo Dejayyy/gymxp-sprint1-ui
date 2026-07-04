@@ -11,10 +11,18 @@ import os
 import json
 import bcrypt
 import jwt
+import os
 
-from openai import OpenAI
+from pydantic import BaseModel
 from dotenv import load_dotenv
+from google import genai
+from google.genai import types
+from openai import OpenAI
+
+
 load_dotenv()
+
+
 
 # --- 1. DATABASE CONFIGURATION ---
 DATABASE_URL = "sqlite:///./workout_demo.db"
@@ -399,3 +407,50 @@ def get_nutrition_plan(user: UserDB = Depends(get_current_user), db: Session = D
 @app.get("/protected-profile")
 def get_profile(user: UserDB = Depends(get_current_user)):
     return {"message": f"Welcome back, {user.email}! This is your private health data."}
+
+
+
+# AI CHATBOX INTEGRATION
+
+
+base_url= "https://aistudio.google.com/api-keys"
+# 2. Safely extract the secret key out of the environment
+API_KEY = os.getenv("GEMINI_API_KEY")
+
+# 3. Initialize your Gemini client securely using that key
+client = genai.Client(api_key=API_KEY)
+
+
+# 4. Define what the incoming message looks like
+class ChatMessage(BaseModel):
+    message: str
+
+# 5. Create the endpoint to receive the message
+
+@app.post("/chat")
+def chat_with_ai(chat_data: ChatMessage):
+    user_text = chat_data.message
+    
+    # 6. Set up your GymXP Coach system instructions persona
+    coach_prompt = (
+        "You are the GymXP Coach, an energetic and knowledgeable fitness assistant. "
+        "Keep your answers concise, motivating, and strictly related to fitness, "
+        "nutrition, or the GymXP app. Politely decline to answer questions outside of these topics."
+    )
+
+    try:
+        # 7. Make the real live API request to Gemini
+        response = client.models.generate_content(
+            model="gemini-2.5-flash", 
+            contents=user_text,
+            config=types.GenerateContentConfig(
+                system_instruction=coach_prompt,
+                temperature=0.7
+            )
+        )
+        # Send the real AI text back to your React floating chat box
+        return {"reply": response.text}
+        
+    except Exception as e:
+        # If anything goes wrong (like an expired key), catch it without crashing Uvicorn
+        return {"reply": f"Sorry, I had trouble reaching my brain. Error: {str(e)}"}
