@@ -1320,4 +1320,427 @@ button {
   }
 }
 
+/* Two-week nutrition calendar + day detail */
+.calendarGrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 16px;
+}
 
+.calendarDay {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  min-height: 118px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfa;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* Today gets a mint outline so the current day stands out at a glance. */
+.calendarDay.today {
+  border-color: var(--mint);
+  box-shadow: inset 0 0 0 1px var(--mint);
+}
+
+.calendarDay.selected {
+  background: #ffffff;
+  border-color: var(--ink);
+  box-shadow: 0 8px 20px rgba(23, 34, 30, 0.09);
+}
+
+.calendarDay:focus-visible {
+  outline: 2px solid var(--mint);
+  outline-offset: 2px;
+}
+
+.calendarDayHead {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.calendarDayHead > span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.calendarDayHead strong {
+  font-size: 0.9rem;
+}
+
+.calendarDayHead em {
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--mint-soft);
+  color: #205449;
+  font-size: 0.62rem;
+  font-style: normal;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.calendarMeals {
+  display: grid;
+  gap: 5px;
+}
+
+.calendarMeal {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--ink);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.calendarMeal > span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Star marks meals the coach picked to push the member out of their usual rotation. */
+.calendarMeal svg {
+  flex: 0 0 auto;
+  color: var(--amber);
+}
+
+.slotDot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.slotDot.breakfast { background: var(--amber); }
+.slotDot.lunch { background: var(--mint); }
+.slotDot.dinner { background: var(--coral); }
+.slotDot.snack { background: var(--aqua); }
+
+/* Selected-day detail list reuses the existing meal card. */
+.dayView {
+  display: grid;
+  gap: 14px;
+}
+
+.dayViewHead h2 {
+  margin: 4px 0 0;
+  font-size: 1.25rem;
+}
+
+.dayEntry {
+  display: grid;
+}
+
+.experimentalTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 8px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--mint-soft);
+  color: #205449;
+  font-size: 0.7rem;
+  font-weight: 850;
+  vertical-align: middle;
+}
+
+.experimentalTag svg {
+  color: var(--amber);
+}
+
+@media (max-width: 780px) {
+  .calendarGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Confirm bar before replacing the live plan. */
+.confirmBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 12px 0 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--amber);
+  border-radius: 8px;
+  background: #fdf3dd;
+  color: #6a4b12;
+  font-weight: 750;
+}
+
+.confirmBar__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.confirmBar__actions .primaryBtn,
+.confirmBar__actions .secondaryBtn {
+  min-height: 38px;
+  cursor: pointer;
+}
+
+/* Day meals sit in a responsive card grid, like the Workouts suggestions. */
+.dayMealGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 18px;
+}
+
+/* Column layout so the action buttons line up along the bottom of every card. */
+.dayEntry {
+  display: flex;
+  flex-direction: column;
+}
+
+.mealActions {
+  display: flex;
+  gap: 10px;
+  margin-top: auto;   /* pin to the bottom regardless of ingredient count */
+  padding-top: 14px;
+}
+
+/* Eaten / Skip match the app's secondary buttons, with a clear active state. */
+.statusBtn {
+  flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--ink);
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.statusBtn:hover {
+  border-color: var(--ink);
+}
+
+.statusBtn--done {
+  border-color: var(--mint);
+  background: var(--mint-soft);
+  color: #205449;
+}
+
+.statusBtn--skip {
+  border-color: #f3b7ab;
+  background: #fdeae6;
+  color: #a3271a;
+}
+
+/* Completed / skipped meal cards read as settled. */
+.dayEntry--completed {
+  border-color: var(--mint);
+}
+
+.dayEntry--skipped {
+  opacity: 0.72;
+}
+
+/* Calendar reflects what actually happened. */
+.calendarMeal--done {
+  color: var(--muted);
+}
+
+.calendarMeal--done svg {
+  color: var(--mint);
+}
+
+.calendarMeal--skipped {
+  color: #b9a29d;
+  text-decoration: line-through;
+}
+
+@media (max-width: 600px) {
+  .dayMealGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Shop list styles */
+
+/* Pill toggle, same idiom as the top nav tabs. */
+.planTabs {
+  display: inline-flex;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.planTabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--muted);
+  background: transparent;
+  font-size: 0.92rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.planTabs .active {
+  color: var(--ink);
+  background: #ffffff;
+  box-shadow: 0 8px 20px rgba(23, 34, 30, 0.09);
+}
+
+/* Household-size stepper. */
+.peopleStepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfa;
+}
+
+.peopleStepper span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
+.peopleStepper strong {
+  min-width: 18px;
+  text-align: center;
+  font-size: 1rem;
+}
+
+.peopleStepper button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #ffffff;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.peopleStepper button:hover {
+  border-color: var(--ink);
+}
+
+/* The list itself. */
+.shopList {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.shopItem {
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfa;
+}
+
+.shopItemHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.shopItemHead strong {
+  font-size: 1.05rem;
+  text-transform: capitalize;
+}
+
+.shopQty {
+  white-space: nowrap;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--mint-soft);
+  color: #205449;
+  font-size: 0.88rem;
+  font-weight: 850;
+}
+
+/* Which meals + days each ingredient covers. */
+.shopUses {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.shopUses li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.shopUseMeal {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.shopUseMeal em {
+  color: var(--muted);
+  font-style: normal;
+  font-weight: 750;
+  font-size: 0.85rem;
+}
+
+.shopDays {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.shopDays span {
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+@media (max-width: 600px) {
+  .planTabs {
+    display: flex;
+  }
+
+  .planTabs button {
+    flex: 1 1 0;
+    justify-content: center;
+  }
+}
