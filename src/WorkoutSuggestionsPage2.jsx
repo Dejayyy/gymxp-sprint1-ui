@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-
+import { CircularProgressbar, buildStyles } from 'react-circular-progressbar';
+import 'react-circular-progressbar/dist/styles.css';
 /* ------------------------------------------------------------------ */
 import {
   Activity,
@@ -12,7 +13,11 @@ import {
   ShieldCheck,
   Sparkles,
   Target,
+  ChartNoAxesCombined
 } from "lucide-react";
+
+// Temporary progress
+const progress = 89
 
 const API_BASE = "http://localhost:8000";
 function WorkoutSuggestionsPage2({ onShowLogin }) {
@@ -126,6 +131,13 @@ function WorkoutSuggestionsPage2({ onShowLogin }) {
       setFocus2(result.focus2);
       setIntensity(result.wo_intensity);
 
+      // Progression
+      const progression = [
+      ["Progressing well!", "Keep doing what you are doing and jump into a workout today!"],
+      ["Behind on goals.", "Be sure to keep on top of your schedule!"],
+      ["No Progress.", "Let's get started and meet your goals!"]
+      ];
+
     } catch (err) {
       setError(err.message || "Failed to communicate with the ML server.");
     } finally {
@@ -139,24 +151,36 @@ function WorkoutSuggestionsPage2({ onShowLogin }) {
         <div className="suggestionsHeroText">
           <p className="eyebrow">ML workout suggestions</p>
           <h1>Recommended sessions for your next workout</h1>
+          <p>{fName} {lName}</p>
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
             <label>
               User ID:
               <input type="number" name="user_id" value={user.user_id} onChange={handleChange} style={{ width: '100%', padding: '8px' }} />
             </label>
-            <button type="submit" disabled={loading} style={{ padding: '10px', cursor: 'pointer', background: '#007BFF', color: '#fff', border: 'none' }}>
-              {loading ? 'Calculating...' : 'Workout Suggestion'}
-            </button>
           </form>
           <div className="actionRow">
             <button className="primaryBtn" type="button" onClick={handleSubmit}>
               <Sparkles size={18} />
-              <span>Use top suggestion</span>
+              <span>{loading ? 'Generating...' : 'Generate Workouts'}</span>
             </button>
-            <button className="secondaryBtn" type="button">
+            <button className="secondaryBtn" type="button" onClick={handleSubmit}>
               <RefreshCw size={18} />
-              <span>Refresh</span>
+              <span>{loading ? 'Refreshing...' : 'Refresh'}</span>
             </button>
+          </div>
+        </div>
+        <div className="modelCard" aria-label="Model readiness">
+          <strong style={{ fontSize: 40 }}>Goal Progression</strong>
+          <div className="goalMeter">
+            <CircularProgressbar value={progress} text={`${progress}%`} styles={buildStyles({pathColor: `rgb(0, 175, 0, ${progress / 100})`, textColor: 'rgb(255, 255, 255)'  })}/>
+              <div>
+              <strong>Progressing well!</strong>
+              <p>Keep doing what you are doing and jump into a workout today!"</p>
+              </div>
+          </div>
+          <div className="modelScore">
+            {/* <span>Confidence preview</span>
+            <b>94%</b> */}
           </div>
         </div>
       </section>
@@ -196,12 +220,12 @@ function WorkoutSuggestionsPage2({ onShowLogin }) {
               <span>
                 <Flame size={17} /> {suggestion.intensity}
               </span>
-              <span>
+              {/* <span>
                 <Target size={17} /> {suggestion.focus}
-              </span>
+              </span> */}
             </div>
 
-            <p className="suggestionReason">{suggestion.reason}</p>
+            {/* <p className="suggestionReason">{suggestion.reason}</p> */}
 
             <div className="exercisePreview">
               {suggestion.moves.map((move) => (

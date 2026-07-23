@@ -12,7 +12,6 @@ import torch
 import math
 import torch.nn as nn
 import numpy as np
-#from model_pretrain import WorkoutNet
 import os
 import json
 import random
@@ -428,7 +427,7 @@ def predict_workout(data: PredictionInput):
     # Define the device
     # Define the device
     device = 'cpu'
-    user_id = 59
+    #user_id = 59
 
     # Define the model
     class WorkoutNet(nn.Module):
@@ -504,7 +503,7 @@ def predict_workout(data: PredictionInput):
     max_time = user_data_init.iloc[user_id]['time_commitment']
     if max_time < 0.5:
         max_time = 0.5
-    time_commitment = max_time*60
+    time_commitment = round(max_time*60)
     num_exercises = int((time_commitment) / 10)
 
     exercise_length = []
@@ -545,10 +544,10 @@ def predict_workout(data: PredictionInput):
          "constraints": 'None',
          "recovery": recovery_suggestion,
          "equipment": user_data_init.iloc[user_id]['equipment'],
-         "time": str(round(time_commitment)/4),
-         "time1": str(round(time_commitment-(exercise_length[0]*10))/4)+ " mins",
-         "time2": str(round(time_commitment-(exercise_length[1]*10))/4)+ " mins",
-         "time3": str(round(time_commitment-(exercise_length[2]*10))/4) + " mins",
+         "time": str(time_commitment) + " mins",
+         "time1": str(round(time_commitment-(exercise_length[0]*10)))+ " mins",
+         "time2": str(round(time_commitment-(exercise_length[1]*10)))+ " mins",
+         "time3": str(round(time_commitment-(exercise_length[2]*10))) + " mins",
          "focus1": user_data_init.iloc[user_id]['bodypart1'],
          "focus2": user_data_init.iloc[user_id]['bodypart2'],
          "wo_intensity": intensity,
