@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 
 const API_BASE = "http://localhost:8000";
-function WorkoutSuggestionsPage({ onShowLogin }) {
+function WorkoutSuggestionsPage2({ onShowLogin }) {
 
   const [user, setUser] = useState({user_id: 59});
   //const [wo_data, setData] = useState(null);
@@ -242,4 +242,4 @@ function WorkoutSuggestionsPage({ onShowLogin }) {
   );
 }
 
-export default WorkoutSuggestionsPage;
+export default WorkoutSuggestionsPage2;
