@@ -13,6 +13,23 @@ const SLOT_LABELS = {
   snack: "Snack",
 };
 
+// Aisle order + display labels for grouping the shopping list.
+const CATEGORY_LABELS = {
+  produce: "Produce",
+  protein: "Protein",
+  dairy: "Dairy",
+  grains: "Grains & starches",
+  pantry: "Pantry",
+  frozen: "Frozen",
+  other: "Other",
+};
+const CATEGORY_ORDER = ["produce", "protein", "dairy", "grains", "pantry", "frozen", "other"];
+
+// One localStorage key per plan, so checked-off items don't bleed into the next generated plan.
+function checkedStorageKey(scheduleId) {
+  return `gymxp:shopping-checked:${scheduleId}`;
+}
+
 // Round to one decimal and drop a trailing ".0".
 function fmtNum(value) {
   const n = Math.round(Number(value) * 10) / 10;
@@ -64,6 +81,8 @@ function NutritionPage({ onShowLogin }) {
   const [shopping, setShopping] = useState(null);
   const [shoppingLoading, setShoppingLoading] = useState(false);
   const [shoppingError, setShoppingError] = useState("");
+  const [checkedItems, setCheckedItems] = useState(() => new Set());
+  const [expandedItems, setExpandedItems] = useState(() => new Set());
 
   const openPlan = (data) => {
     setPlan(data);
@@ -131,6 +150,42 @@ function NutritionPage({ onShowLogin }) {
 
     return () => { cancelled = true; };
   }, [view, people, plan]);
+
+  // Restore checked-off items for this plan. Keyed by schedule_id so a fresh
+  // plan (regenerated or newly generated) always starts with a clean list.
+  useEffect(() => {
+    if (!plan) return;
+    try {
+      const raw = localStorage.getItem(checkedStorageKey(plan.schedule_id));
+      setCheckedItems(raw ? new Set(JSON.parse(raw)) : new Set());
+    } catch (error) {
+      setCheckedItems(new Set());
+    }
+    setExpandedItems(new Set());
+  }, [plan]);
+
+  const toggleChecked = (itemKey) => {
+    setCheckedItems((prev) => {
+      const next = new Set(prev);
+      next.has(itemKey) ? next.delete(itemKey) : next.add(itemKey);
+      if (plan) {
+        try {
+          localStorage.setItem(checkedStorageKey(plan.schedule_id), JSON.stringify([...next]));
+        } catch (error) {
+          // Storage full or unavailable — checked state just won't persist across reloads.
+        }
+      }
+      return next;
+    });
+  };
+
+  const toggleExpanded = (itemKey) => {
+    setExpandedItems((prev) => {
+      const next = new Set(prev);
+      next.has(itemKey) ? next.delete(itemKey) : next.add(itemKey);
+      return next;
+    });
+  };
 
   const generate = async (replace = false) => {
     setErrorMessage("");
@@ -436,15 +491,24 @@ function NutritionPage({ onShowLogin }) {
               <p className="eyebrow">Everything for 14 days</p>
               <h2>Shopping list</h2>
             </div>
-            <div className="peopleStepper">
-              <span>People</span>
-              <button type="button" aria-label="Fewer people" onClick={() => setPeople((n) => Math.max(1, n - 1))}>
-                <Minus size={16} />
-              </button>
-              <strong>{people}</strong>
-              <button type="button" aria-label="More people" onClick={() => setPeople((n) => Math.min(20, n + 1))}>
-                <Plus size={16} />
-              </button>
+            <div className="panelHeaderActions">
+              {shopping && shopping.items.length > 0 && (
+                <span className="shopProgress">
+                  {shopping.items.filter((item) => checkedItems.has(`${item.name}-${item.unit}`)).length}
+                  {" / "}
+                  {shopping.items.length} checked
+                </span>
+              )}
+              <div className="peopleStepper">
+                <span>People</span>
+                <button type="button" aria-label="Fewer people" onClick={() => setPeople((n) => Math.max(1, n - 1))}>
+                  <Minus size={16} />
+                </button>
+                <strong>{people}</strong>
+                <button type="button" aria-label="More people" onClick={() => setPeople((n) => Math.min(20, n + 1))}>
+                  <Plus size={16} />
+                </button>
+              </div>
             </div>
           </div>
 
@@ -455,34 +519,86 @@ function NutritionPage({ onShowLogin }) {
             <p className="mealDesc">No ingredients found for this plan.</p>
           )}
 
-          {!shoppingLoading && shopping && shopping.items.length > 0 && (
-            <div className="shopList">
-              {shopping.items.map((item, idx) => (
-                <div className="shopItem" key={`${item.name}-${item.unit}-${idx}`}>
-                  <div className="shopItemHead">
-                    <strong>{item.name}</strong>
-                    <span className="shopQty">{qtyLabel(item.total_quantity, item.unit)}</span>
+          {!shoppingLoading && shopping && shopping.items.length > 0 && (() => {
+            // Items arrive pre-sorted by category from the backend — group consecutive
+            // items under one heading rather than re-sorting on the client.
+            const groups = [];
+            for (const item of shopping.items) {
+              const category = item.category || "other";
+              const last = groups[groups.length - 1];
+              if (last && last.category === category) {
+                last.items.push(item);
+              } else {
+                groups.push({ category, items: [item] });
+              }
+            }
+
+            return (
+              <div className="shopGroups">
+                {groups.map((group) => (
+                  <div className="shopGroup" key={group.category}>
+                    <h3 className="shopGroupTitle">{CATEGORY_LABELS[group.category] || "Other"}</h3>
+                    <div className="shopList">
+                      {group.items.map((item) => {
+                        const itemKey = `${item.name}-${item.unit}`;
+                        const checked = checkedItems.has(itemKey);
+                        const expanded = expandedItems.has(itemKey);
+                        return (
+                          <div className={`shopItem${checked ? " shopItem--checked" : ""}`} key={itemKey}>
+                            <div
+                              className="shopItemHead"
+                              onClick={() => toggleChecked(itemKey)}
+                              role="button"
+                              tabIndex={0}
+                              aria-pressed={checked}
+                              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleChecked(itemKey); } }}
+                            >
+                              <span className="shopCheckbox" aria-hidden="true">
+                                {checked && <Check size={14} />}
+                              </span>
+
+                              <span className="shopItemMain">
+                                <strong>{item.name}</strong>
+                                <button
+                                  type="button"
+                                  className="shopUsesToggle"
+                                  onClick={(e) => { e.stopPropagation(); toggleExpanded(itemKey); }}
+                                  aria-expanded={expanded}
+                                >
+                                  {expanded ? "Hide" : "Used in"} {item.uses.length} meal{item.uses.length === 1 ? "" : "s"}
+                                </button>
+                              </span>
+
+                              <span className="shopQty">{qtyLabel(item.total_quantity, item.unit)}</span>
+                            </div>
+
+                            {expanded && (
+                              <ul className="shopUses">
+                                {item.uses.map((use, i) => (
+                                  <li key={i}>
+                                    <span className="shopUseMeal">
+                                      <i className={`slotDot ${use.slot}`} />
+                                      {SLOT_LABELS[use.slot] || use.slot} · {use.meal_name}
+                                      <em>{use.occurrences}× · {qtyLabel(use.per_meal_quantity, item.unit)} each</em>
+                                    </span>
+                                    <span className="shopDays">
+                                      {use.days.map((d) => (
+                                        <span key={d}>{dayLabels(d).day}</span>
+                                      ))}
+                                    </span>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <ul className="shopUses">
-                    {item.uses.map((use, i) => (
-                      <li key={i}>
-                        <span className="shopUseMeal">
-                          <i className={`slotDot ${use.slot}`} />
-                          {SLOT_LABELS[use.slot] || use.slot} · {use.meal_name}
-                          <em>{use.occurrences}× · {qtyLabel(use.per_meal_quantity, item.unit)} each</em>
-                        </span>
-                        <span className="shopDays">
-                          {use.days.map((d) => (
-                            <span key={d}>{dayLabels(d).day}</span>
-                          ))}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            );
+          })()}
         </section>
       )}
     </div>

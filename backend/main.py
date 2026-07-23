@@ -6,7 +6,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from datetime import datetime, timedelta, date
 from typing import Optional, List, Literal
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 import os
 import json
 import bcrypt
@@ -214,6 +214,11 @@ class GenTargets(BaseModel):
     fat_g: int
     water_ml: int
 
+from pydantic import field_validator
+
+CATEGORY_OPTIONS = ["produce", "protein", "dairy", "grains", "pantry", "frozen", "other"]
+Category = Literal["produce", "protein", "dairy", "grains", "pantry", "frozen", "other"]
+
 # Structured quantity + unit so a shopping list can sum and scale ingredients later.
 # Free-text like "a handful" can't be aggregated, so the model must give real numbers.
 class GenItem(BaseModel):
@@ -222,6 +227,17 @@ class GenItem(BaseModel):
     quantity: float
     unit: str            # g / ml / tbsp / tsp / cup / whole / pinch
     note: str = ""       # optional prep note, e.g. "diced"
+    category: Category = "other"  # aisle grouping for the shopping list
+
+    # The model sometimes invents a category we didn't list (e.g. "supplement").
+    # Rather than hard-failing the whole plan over one mislabeled ingredient,
+    # fall back to "other" so generation never breaks on this field.
+    @field_validator("category", mode="before")
+    @classmethod
+    def _coerce_category(cls, value):
+        if isinstance(value, str) and value.lower() in CATEGORY_OPTIONS:
+            return value.lower()
+        return "other"
 
 class GenMeal(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -250,6 +266,7 @@ Rules you must always follow:
 - Avoid disliked foods; favor the foods they enjoy.
 - Return a LIBRARY of meals to rotate across the two weeks, NOT one unique meal per day. For each requested slot, give the requested number of distinct options. Repetition across days is expected and helps the member buy and prep in bulk.
 - Every item must have a numeric quantity and a simple unit so ingredients can be summed into a shopping list. Use canonical ingredient names ("chicken breast", not "grilled chicken breast strips").
+- Tag every item with the grocery aisle category it belongs to (produce, protein, dairy, grains, pantry, frozen, other) so the shopping list can be grouped by aisle.
 - Each meal's macros should be sensible for its slot; a full day of meals should sum to roughly the daily targets.
 - Set experimental=true on options that go beyond the member's stated favourites to introduce something new they may enjoy. Base new ideas on what they already like.
 - If no calorie target is given, estimate sensible targets from goal, body stats, and weekly training. Never propose a clinically low calorie target; for medical conditions, advise the member to consult a professional.
@@ -270,7 +287,7 @@ PLAN_JSON_SHAPE = """Respond with ONLY a JSON object of this exact shape, no ext
       "description": "string",
       "experimental": false,
       "items": [
-        {"name": "canonical ingredient", "quantity": number, "unit": "g|ml|tbsp|tsp|cup|whole|pinch", "note": "optional"}
+        {"name": "canonical ingredient", "quantity": number, "unit": "g|ml|tbsp|tsp|cup|whole|pinch", "note": "optional", "category": "produce|protein|dairy|grains|pantry|frozen|other"}
       ],
       "macros": {"calories": int, "protein_g": int, "carbs_g": int, "fat_g": int}
     }
@@ -580,6 +597,17 @@ def list_schedules(user: UserDB = Depends(get_current_user), db: Session = Depen
         for r in rows
     ]
 
+# Aisle order the shopping list groups items into — mirrors a typical store walk.
+CATEGORY_ORDER = ["produce", "protein", "dairy", "grains", "pantry", "frozen", "other"]
+
+# Bump small-unit totals up to the bigger unit once they cross 1000 (1000g -> 1kg),
+# since nobody wants to read "2400 g of rice" on a shopping list.
+def normalize_unit(total: float, unit: str):
+    bump = {"g": "kg", "ml": "l"}
+    if unit in bump and total >= 1000:
+        return round(total / 1000, 2), bump[unit]
+    return round(total, 2), unit
+
 # Aggregate every ingredient across the active plan into one shopping list.
 # Quantities are per single serving, so multiply by `people` to feed a household.
 # Declared before /schedule/{schedule_id} so the literal path wins over the int route.
@@ -609,10 +637,13 @@ def shopping_list(people: int = 1, user: UserDB = Depends(get_current_user), db:
         for item in json.loads(meal.meal_json).get("items", []):
             name = (item.get("name") or "").strip()
             unit = item.get("unit") or ""
+            category = item.get("category") or "other"
             per_meal = float(item.get("quantity") or 0) * people  # scaled to household size
             key = (name.lower(), unit)
 
-            bucket = agg.setdefault(key, {"name": name, "unit": unit, "total": 0.0, "uses": {}})
+            bucket = agg.setdefault(key, {
+                "name": name, "unit": unit, "category": category, "total": 0.0, "uses": {},
+            })
             bucket["total"] += per_meal
 
             # One "use" per meal this ingredient appears in; collect the days it's needed.
@@ -637,13 +668,18 @@ def shopping_list(people: int = 1, user: UserDB = Depends(get_current_user), db:
                 "subtotal": round(u["per_meal_quantity"] * len(u["days"]), 2),
             })
         uses.sort(key=lambda x: (-x["subtotal"], x["meal_name"]))
+        total_quantity, unit = normalize_unit(bucket["total"], bucket["unit"])
         items.append({
             "name": bucket["name"],
-            "unit": bucket["unit"],
-            "total_quantity": round(bucket["total"], 2),
+            "unit": unit,
+            "category": bucket["category"],
+            "total_quantity": total_quantity,
             "uses": uses,
         })
-    items.sort(key=lambda x: x["name"].lower())
+    items.sort(key=lambda x: (
+        CATEGORY_ORDER.index(x["category"]) if x["category"] in CATEGORY_ORDER else len(CATEGORY_ORDER),
+        x["name"].lower(),
+    ))
 
     return {
         "people": people,
