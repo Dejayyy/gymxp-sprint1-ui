@@ -750,6 +750,96 @@ def get_schedule(user: UserDB = Depends(get_current_user), db: Session = Depends
         raise HTTPException(status_code=404, detail="No active schedule yet.")
     return schedule
 
+# Every distinct meal currently in the active plan's rotation, grouped by slot —
+# the "deck" the planner drags cards from. Only meals actually placed on the
+# calendar, not every meal ever generated for the user.
+@app.get("/schedule/library")
+def get_schedule_library(user: UserDB = Depends(get_current_user), db: Session = Depends(get_db)):
+    schedule = (
+        db.query(ScheduleDB)
+        .filter(ScheduleDB.user_id == user.id, ScheduleDB.status == "active")
+        .order_by(ScheduleDB.created_at.desc())
+        .first()
+    )
+    if schedule is None:
+        raise HTTPException(status_code=404, detail="No active schedule yet.")
+
+    entries = db.query(ScheduleEntryDB).filter(ScheduleEntryDB.schedule_id == schedule.id).all()
+    meal_ids = {e.meal_id for e in entries}
+    meals = db.query(MealDB).filter(MealDB.id.in_(meal_ids)).all() if meal_ids else []
+
+    grouped = {}
+    for meal in meals:
+        grouped.setdefault(meal.slot, []).append(serialize_meal(meal))
+    for slot_meals in grouped.values():
+        slot_meals.sort(key=lambda m: m["name"].lower())
+
+    return {"schedule_id": schedule.id, "library": grouped}
+
+# Assign an EXISTING library meal to a specific day/slot — the "drop a card
+# from the library onto a day" action. Distinct from replace-meal, which
+# generates a brand new meal via the LLM.
+class MealAssignRequest(BaseModel):
+    meal_id: int
+
+@app.patch("/schedule/entries/{entry_id}/assign")
+def assign_meal(entry_id: int, body: MealAssignRequest,
+                user: UserDB = Depends(get_current_user), db: Session = Depends(get_db)):
+    entry = (
+        db.query(ScheduleEntryDB)
+        .join(ScheduleDB, ScheduleEntryDB.schedule_id == ScheduleDB.id)
+        .filter(ScheduleEntryDB.id == entry_id, ScheduleDB.user_id == user.id)
+        .first()
+    )
+    if entry is None:
+        raise HTTPException(status_code=404, detail="Meal not found on your plan.")
+
+    meal = db.query(MealDB).filter(MealDB.id == body.meal_id, MealDB.user_id == user.id).first()
+    if meal is None:
+        raise HTTPException(status_code=404, detail="That meal wasn't found.")
+    if meal.slot != entry.slot:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"That's a {meal.slot} option and can't be placed in the {entry.slot} slot.",
+        )
+
+    entry.meal_id = meal.id
+    db.commit()
+    return load_active_schedule(user, db)
+
+# Swap the meals between two entries — the "drag one day's card onto another
+# day" action. Restricted to the same slot so macros/targets stay sensible.
+class EntrySwapRequest(BaseModel):
+    entry_id_a: int
+    entry_id_b: int
+
+@app.post("/schedule/entries/swap")
+def swap_entries(body: EntrySwapRequest,
+                 user: UserDB = Depends(get_current_user), db: Session = Depends(get_db)):
+    if body.entry_id_a == body.entry_id_b:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Can't swap a meal with itself.")
+
+    entries = (
+        db.query(ScheduleEntryDB)
+        .join(ScheduleDB, ScheduleEntryDB.schedule_id == ScheduleDB.id)
+        .filter(ScheduleEntryDB.id.in_([body.entry_id_a, body.entry_id_b]), ScheduleDB.user_id == user.id)
+        .all()
+    )
+    if len(entries) != 2:
+        raise HTTPException(status_code=404, detail="One of those meals wasn't found on your plan.")
+
+    entry_a = next(e for e in entries if e.id == body.entry_id_a)
+    entry_b = next(e for e in entries if e.id == body.entry_id_b)
+    if entry_a.slot != entry_b.slot:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Can only swap meals within the same slot ({entry_a.slot} vs {entry_b.slot}).",
+        )
+
+    entry_a.meal_id, entry_b.meal_id = entry_b.meal_id, entry_a.meal_id
+    db.commit()
+    return load_active_schedule(user, db)
+
 # Mark a single meal eaten/skipped. This adherence data feeds future prompts later.
 class EntryStatusUpdate(BaseModel):
     status: Literal["planned", "completed", "skipped"]

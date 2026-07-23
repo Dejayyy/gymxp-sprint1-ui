@@ -1,7 +1,8 @@
-import React, { useMemo, useEffect, useState } from "react";
+import React, { useMemo, useEffect, useState, useRef } from "react";
 import {
   Sparkles, Flame, RefreshCw, Salad, LogIn, Star, Check, X, Heart,
-  CalendarDays, ShoppingCart, Minus, Plus,
+  CalendarDays, ShoppingCart, Minus, Plus, LayoutGrid, GripVertical, ArrowLeftRight,
+  ChevronLeft, ChevronRight,
 } from "lucide-react";
 
 const API_BASE = "http://localhost:8000";
@@ -76,7 +77,7 @@ function NutritionPage({ onShowLogin }) {
   const [selectedDay, setSelectedDay] = useState(0);
   const [confirmRegen, setConfirmRegen] = useState(false);
 
-  const [view, setView] = useState("schedule"); // schedule | shopping
+  const [view, setView] = useState("schedule"); // schedule | shopping | planner
   const [people, setPeople] = useState(1);
   const [shopping, setShopping] = useState(null);
   const [shoppingLoading, setShoppingLoading] = useState(false);
@@ -86,11 +87,20 @@ function NutritionPage({ onShowLogin }) {
   const [replaceChoiceFor, setReplaceChoiceFor] = useState(null); // entry_id showing the swap-scope choice
   const [replacingEntryId, setReplacingEntryId] = useState(null); // entry_id currently mid-swap
 
+  const [library, setLibrary] = useState(null);
+  const [libraryLoading, setLibraryLoading] = useState(false);
+  const [libraryError, setLibraryError] = useState("");
+  const [libraryOpen, setLibraryOpen] = useState(true);
+  const dragPayloadRef = useRef(null); // what's being dragged — not state, drag events fire too fast to wait on renders
+  const [draggingSlot, setDraggingSlot] = useState(null); // slot of whatever's mid-drag, for drop-target highlighting
+  const [dropTargetId, setDropTargetId] = useState(null); // entry_id currently hovered while dragging
+
   const openPlan = (data) => {
     setPlan(data);
     const o = todayOffset(data);
     setSelectedDay(o < 0 ? 0 : o);
     setShopping(null); // list is stale after a new plan
+    setLibrary(null);
   };
 
   // For in-place edits (liked toggle aside) that change ingredients — swap-a-meal —
@@ -98,6 +108,7 @@ function NutritionPage({ onShowLogin }) {
   const updatePlan = (data) => {
     setPlan(data);
     setShopping(null); // ingredients may have changed
+    setLibrary(null);  // rotation may have changed
   };
 
   useEffect(() => {
@@ -159,6 +170,32 @@ function NutritionPage({ onShowLogin }) {
 
     return () => { cancelled = true; };
   }, [view, people, plan]);
+
+  // Fetch the meal library whenever the planner tab is opened (and not already cached).
+  useEffect(() => {
+    if (view !== "planner" || !plan || library) return;
+    let cancelled = false;
+
+    (async () => {
+      setLibraryLoading(true);
+      setLibraryError("");
+      try {
+        const response = await fetch(`${API_BASE}/schedule/library`, { headers: authHeaders() });
+        if (!response.ok) {
+          if (!cancelled) setLibraryError("We couldn't load your meal library. Try again.");
+          return;
+        }
+        const data = await response.json();
+        if (!cancelled) setLibrary(data);
+      } catch (error) {
+        if (!cancelled) setLibraryError("Cannot reach backend server. Is Uvicorn running on port 8000?");
+      } finally {
+        if (!cancelled) setLibraryLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [view, plan, library]);
 
   // Restore checked-off items for this plan. Keyed by schedule_id so a fresh
   // plan (regenerated or newly generated) always starts with a clean list.
@@ -321,6 +358,80 @@ function NutritionPage({ onShowLogin }) {
     }
   };
 
+  // --- Planner drag & drop ---
+  // Native HTML5 DnD, no extra library — the payload lives in a ref (not state)
+  // since dragstart/dragover fire far faster than React wants to re-render.
+  const handleLibraryDragStart = (meal) => (event) => {
+    dragPayloadRef.current = { type: "library", mealId: meal.id, slot: meal.slot };
+    setDraggingSlot(meal.slot);
+    event.dataTransfer.effectAllowed = "copy";
+  };
+
+  const handleEntryDragStart = (entry) => (event) => {
+    dragPayloadRef.current = { type: "entry", entryId: entry.entry_id, slot: entry.slot };
+    setDraggingSlot(entry.slot);
+    event.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragEnd = () => {
+    dragPayloadRef.current = null;
+    setDraggingSlot(null);
+    setDropTargetId(null);
+  };
+
+  const handleDragOverEntry = (entry) => (event) => {
+    if (!dragPayloadRef.current) return;
+    event.preventDefault(); // required to allow a drop
+    setDropTargetId(entry.entry_id);
+  };
+
+  const handleDropOnEntry = (targetEntry) => async (event) => {
+    event.preventDefault();
+    const payload = dragPayloadRef.current;
+    dragPayloadRef.current = null;
+    setDraggingSlot(null);
+    setDropTargetId(null);
+    if (!payload) return;
+
+    if (payload.slot !== targetEntry.slot) {
+      setErrorMessage(
+        `That's a ${SLOT_LABELS[payload.slot] || payload.slot} option and can't go in the ${SLOT_LABELS[targetEntry.slot] || targetEntry.slot} slot.`
+      );
+      return;
+    }
+    if (payload.type === "library" && payload.mealId === targetEntry.meal.id) return;
+    if (payload.type === "entry" && payload.entryId === targetEntry.entry_id) return;
+
+    setErrorMessage("");
+    try {
+      const response = payload.type === "library"
+        ? await fetch(`${API_BASE}/schedule/entries/${targetEntry.entry_id}/assign`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json", ...authHeaders() },
+            body: JSON.stringify({ meal_id: payload.mealId }),
+          })
+        : await fetch(`${API_BASE}/schedule/entries/swap`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...authHeaders() },
+            body: JSON.stringify({ entry_id_a: payload.entryId, entry_id_b: targetEntry.entry_id }),
+          });
+
+      if (response.status === 401) {
+        localStorage.removeItem("userToken");
+        setStatus("unauthenticated");
+        return;
+      }
+      const data = await response.json();
+      if (response.ok) {
+        updatePlan(data);
+      } else {
+        setErrorMessage(data.detail || "Could not update the plan. Try again.");
+      }
+    } catch (error) {
+      setErrorMessage("Cannot reach backend server. Is Uvicorn running on port 8000?");
+    }
+  };
+
   const today = useMemo(() => (plan ? todayOffset(plan) : -1), [plan]);
 
   if (status === "loading") {
@@ -410,7 +521,7 @@ function NutritionPage({ onShowLogin }) {
         </div>
       </section>
 
-      {/* Switch between the schedule and the shopping list. */}
+      {/* Switch between the schedule, shopping list, and planner. */}
       <div className="planTabs" role="tablist">
         <button
           type="button"
@@ -429,6 +540,15 @@ function NutritionPage({ onShowLogin }) {
           onClick={() => setView("shopping")}
         >
           <ShoppingCart size={17} /> Shopping list
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={view === "planner"}
+          className={view === "planner" ? "active" : ""}
+          onClick={() => setView("planner")}
+        >
+          <LayoutGrid size={17} /> Planner
         </button>
       </div>
 
@@ -590,7 +710,7 @@ function NutritionPage({ onShowLogin }) {
             </div>
           </section>
         </>
-      ) : (
+      ) : view === "shopping" ? (
         <section className="panel shopPanel">
           <div className="panelHeader">
             <div>
@@ -706,6 +826,110 @@ function NutritionPage({ onShowLogin }) {
             );
           })()}
         </section>
+      ) : (
+        <div className="plannerLayout">
+          {libraryOpen ? (
+            <aside className="plannerLibrary">
+              <div className="panel plannerLibraryPanel">
+                <div className="plannerLibraryHead">
+                  <div>
+                    <p className="eyebrow">Drag onto a day</p>
+                    <h2>Meal library</h2>
+                  </div>
+                  <button
+                    type="button"
+                    className="secondaryBtn iconOnlyBtn"
+                    onClick={() => setLibraryOpen(false)}
+                    aria-label="Collapse meal library"
+                  >
+                    <ChevronLeft size={18} />
+                  </button>
+                </div>
+
+                {libraryError && <div className="formAlert formAlert--error">{libraryError}</div>}
+                {libraryLoading && <p className="profileLoading">Loading your meals…</p>}
+
+                {!libraryLoading && library && (
+                  <div className="libraryGroupsScroll">
+                    <div className="libraryGroups">
+                      {Object.keys(SLOT_LABELS)
+                        .filter((slot) => library.library[slot]?.length)
+                        .map((slot) => (
+                          <div className="libraryGroup" key={slot}>
+                            <h3 className="libraryGroupTitle">
+                              <i className={`slotDot ${slot}`} /> {SLOT_LABELS[slot]}
+                            </h3>
+                            <div className="libraryCards">
+                              {library.library[slot].map((meal) => (
+                                <div
+                                  className={`libraryCard${draggingSlot && draggingSlot !== slot ? " libraryCard--dim" : ""}`}
+                                  key={meal.id}
+                                  draggable
+                                  onDragStart={handleLibraryDragStart(meal)}
+                                  onDragEnd={handleDragEnd}
+                                >
+                                  <GripVertical size={14} className="libraryCardGrip" />
+                                  <span className="libraryCardName">{meal.name}</span>
+                                  <span className="libraryCardKcal">{meal.macros.calories} kcal</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </aside>
+          ) : (
+            <button
+              type="button"
+              className="plannerLibraryToggle"
+              onClick={() => setLibraryOpen(true)}
+              aria-label="Open meal library"
+            >
+              <ChevronRight size={18} />
+              <span>Meal library</span>
+            </button>
+          )}
+
+          <section className="panel plannerBoard">
+            <div className="sectionTitle">
+              <h2>Two-week plan</h2>
+              <span><ArrowLeftRight size={14} /> Drag to rearrange</span>
+            </div>
+
+            <div className="plannerGrid">
+              {plan.days.map((day) => {
+                const { weekday, day: dayNum } = dayLabels(day.date);
+                const isToday = day.day_offset === today;
+                return (
+                  <div className={`plannerDay${isToday ? " plannerDay--today" : ""}`} key={day.day_offset}>
+                    <div className="plannerDayHead">
+                      <span>{weekday}</span>
+                      <strong>{dayNum}</strong>
+                    </div>
+                    {day.entries.map((entry) => (
+                      <div
+                        className={`plannerSlotCard${dropTargetId === entry.entry_id ? " plannerSlotCard--over" : ""}${draggingSlot && draggingSlot !== entry.slot ? " plannerSlotCard--dim" : ""}`}
+                        key={entry.entry_id}
+                        draggable
+                        onDragStart={handleEntryDragStart(entry)}
+                        onDragEnd={handleDragEnd}
+                        onDragOver={handleDragOverEntry(entry)}
+                        onDrop={handleDropOnEntry(entry)}
+                        title={entry.meal.name}
+                      >
+                        <i className={`slotDot ${entry.slot}`} />
+                        <span>{entry.meal.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        </div>
       )}
     </div>
   );

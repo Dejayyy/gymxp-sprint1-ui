@@ -1972,3 +1972,301 @@ button {
     grid-template-columns: 1fr;
   }
 }
+
+/* --- Drag-and-drop meal planner --- */
+
+/* Sidebar (library) + main board, side by side. */
+.plannerLayout {
+  display: flex;
+  align-items: start;
+  gap: 18px;
+}
+
+.plannerLibrary {
+  flex: 0 0 300px;
+  min-width: 0;
+}
+
+.plannerLibraryPanel {
+  display: flex;
+  flex-direction: column;
+  max-height: 640px;
+  padding: 18px;
+}
+
+.plannerLibraryHead {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.plannerLibraryHead h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+/* Its own scroll region — scrolling the library never touches the board.
+   Thin, minimal-chrome scrollbar instead of the default OS widget. */
+.libraryGroupsScroll {
+  flex: 1 1 auto;
+  margin-top: 14px;
+  padding-right: 8px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+
+.libraryGroupsScroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.libraryGroupsScroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.libraryGroupsScroll::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 999px;
+}
+
+.libraryGroupsScroll::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+}
+
+.libraryGroups {
+  display: grid;
+  gap: 16px;
+}
+
+.libraryGroupTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* Stacked list, not wrapped rows — the sidebar is narrow by design. */
+.libraryCards {
+  display: grid;
+  gap: 6px;
+}
+
+.libraryCard {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfa;
+  cursor: grab;
+}
+
+.libraryCard:active {
+  cursor: grabbing;
+}
+
+.libraryCardGrip {
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+
+.libraryCardName {
+  flex: 1 1 auto;
+  overflow: hidden;
+  min-width: 0;
+  color: var(--ink);
+  font-size: 0.83rem;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.libraryCardKcal {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+/* Cards that can't legally be dropped where the drag started fade back. */
+.libraryCard--dim {
+  opacity: 0.35;
+}
+
+/* Collapsed state: a slim vertical tab instead of the full panel. */
+.plannerLibraryToggle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 44px;
+  min-height: 260px;
+  padding: 14px 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.plannerLibraryToggle:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.plannerLibraryToggle span {
+  writing-mode: vertical-rl;
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
+.plannerBoard {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.plannerBoard .sectionTitle span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Wraps like the Schedule tab's calendar, but wider columns (5 instead of 7)
+   so meal names have room to actually read instead of "Italian ...". */
+.plannerGrid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.plannerDay {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfa;
+}
+
+.plannerDay--today {
+  border-color: var(--mint);
+  box-shadow: inset 0 0 0 1px var(--mint);
+}
+
+.plannerDayHead {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.plannerDayHead span {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 850;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.plannerDayHead strong {
+  font-size: 0.85rem;
+}
+
+.plannerSlotCard {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+  padding: 7px 8px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #ffffff;
+  cursor: grab;
+}
+
+.plannerSlotCard:active {
+  cursor: grabbing;
+}
+
+/* Dot sits at cap-height of the first line rather than centered against
+   a now-taller (up to 2-line) block of text. */
+.plannerSlotCard .slotDot {
+  margin-top: 5px;
+}
+
+/* Up to 2 lines instead of a single truncated line — most meal names fit
+   in full this way instead of reading as "Beef an…". */
+.plannerSlotCard span {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-width: 0;
+  color: var(--ink);
+  font-size: 0.76rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+/* Highlighted while something's dragged over it as a valid drop target. */
+.plannerSlotCard--over {
+  border-color: var(--mint);
+  background: var(--mint-soft);
+  box-shadow: inset 0 0 0 1px var(--mint);
+}
+
+/* A different slot than what's being dragged — not a legal target here. */
+.plannerSlotCard--dim {
+  opacity: 0.35;
+}
+
+@media (max-width: 980px) {
+  .plannerGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .plannerLayout {
+    flex-direction: column;
+  }
+
+  .plannerLibrary {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+
+  .plannerLibraryPanel {
+    max-height: 360px;
+  }
+
+  .plannerLibraryToggle {
+    flex-direction: row;
+    width: 100%;
+    min-height: 0;
+    padding: 10px 14px;
+  }
+
+  .plannerLibraryToggle span {
+    writing-mode: horizontal-tb;
+  }
+}
+
+@media (max-width: 780px) {
+  .plannerGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
