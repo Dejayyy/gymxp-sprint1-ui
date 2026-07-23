@@ -1013,6 +1013,36 @@ button {
   font-size: 1.15rem;
 }
 
+.mealHeadActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.likeBtn {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.likeBtn:hover {
+  border-color: var(--coral);
+  color: var(--coral);
+}
+
+.likeBtn--on {
+  border-color: var(--coral);
+  background: #fdeae6;
+  color: var(--coral);
+}
+
 .mealKcal {
   display: inline-flex;
   align-items: center;
@@ -1505,6 +1535,57 @@ button {
 .dayEntry {
   display: flex;
   flex-direction: column;
+}
+
+/* Sits above the pinned Eaten/Skip row; doesn't push them down when collapsed. */
+.tryAnotherBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  justify-self: start;
+  width: fit-content;
+  margin-top: 14px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.tryAnotherBtn:hover {
+  color: var(--ink);
+}
+
+.tryAnotherBtn:disabled {
+  color: var(--muted);
+  cursor: default;
+  opacity: 0.7;
+}
+
+/* Inline choice between swapping one occurrence or disliking the meal outright. */
+.replaceChoice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--amber);
+  border-radius: 8px;
+  background: #fdf3dd;
+  color: #6a4b12;
+  font-size: 0.85rem;
+  font-weight: 750;
+}
+
+.replaceChoice .textButton {
+  cursor: pointer;
+}
+
+.textButton--danger {
+  color: #a3271a;
 }
 
 .mealActions {

@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import create_engine, Column, Integer, String, Float, Text, Boolean, ForeignKey, DateTime, Date
+from sqlalchemy import create_engine, Column, Integer, String, Float, Text, Boolean, ForeignKey, DateTime, Date, func
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from datetime import datetime, timedelta, date
@@ -64,6 +64,7 @@ class MealDB(Base):
     name = Column(String)
     description = Column(String, default="")
     liked = Column(Boolean, default=False)         # member favourited it -> feeds future prompts
+    disliked = Column(Boolean, default=False)      # member explicitly swapped it out -> never repeat
     experimental = Column(Boolean, default=False)  # model tried something new -> star it in the UI
     meal_json = Column(Text)                       # {items: [...], macros: {...}}
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -91,6 +92,19 @@ class ScheduleEntryDB(Base):
     status = Column(String, default="planned")  # planned / completed / skipped
 
 Base.metadata.create_all(bind=engine)
+
+# create_all only creates missing TABLES, not missing COLUMNS on a table that
+# already exists — so a column added after the db file was first created (like
+# `disliked` above) needs a one-time ALTER TABLE on existing installs.
+def _ensure_column(table: str, column: str, ddl: str):
+    with engine.connect() as conn:
+        existing = [row[1] for row in conn.exec_driver_sql(f"PRAGMA table_info({table})")]
+        if column not in existing:
+            conn.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN {ddl}")
+            conn.commit()
+
+_ensure_column("meals", "disliked", "disliked BOOLEAN DEFAULT 0")
+
 
 # --- 2. SECURITY CONFIGURATION ---
 SECRET_KEY = "SUPER_SECRET_KEY_FOR_DEMO"
@@ -214,8 +228,6 @@ class GenTargets(BaseModel):
     fat_g: int
     water_ml: int
 
-from pydantic import field_validator
-
 CATEGORY_OPTIONS = ["produce", "protein", "dairy", "grains", "pantry", "frozen", "other"]
 Category = Literal["produce", "protein", "dairy", "grains", "pantry", "frozen", "other"]
 
@@ -230,8 +242,8 @@ class GenItem(BaseModel):
     category: Category = "other"  # aisle grouping for the shopping list
 
     # The model sometimes invents a category we didn't list (e.g. "supplement").
-    # Rather than hard-failing the whole plan over one mislabeled ingredient,
-    # fall back to "other" so generation never breaks on this field.
+    # Rather than failing the whole plan over one mislabeled ingredient, fall
+    # back to "other" so generation never breaks on this field.
     @field_validator("category", mode="before")
     @classmethod
     def _coerce_category(cls, value):
@@ -253,6 +265,12 @@ class GeneratedLibrary(BaseModel):
     summary: str
     targets: GenTargets
     meals: List[GenMeal]         # the rotation pool, grouped by slot
+
+# The "try another meal" swap asks for one meal, not a whole library — wrap it
+# so the JSON contract still round-trips through the same validation approach.
+class GenSingleMeal(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    meal: GenMeal
 
 # --- 6. PROMPT BUILDING ---
 LIBRARY_PER_SLOT = 4   # distinct options per slot to rotate over two weeks
@@ -294,6 +312,22 @@ PLAN_JSON_SHAPE = """Respond with ONLY a JSON object of this exact shape, no ext
   ]
 }"""
 
+# Same contract as one entry of PLAN_JSON_SHAPE's "meals" array, wrapped in an
+# object — used when swapping out a single meal instead of a whole plan.
+SINGLE_MEAL_JSON_SHAPE = """Respond with ONLY a JSON object of this exact shape, no extra text:
+{
+  "meal": {
+    "slot": "breakfast | lunch | dinner | snack",
+    "name": "string",
+    "description": "string",
+    "experimental": false,
+    "items": [
+      {"name": "canonical ingredient", "quantity": number, "unit": "g|ml|tbsp|tsp|cup|whole|pinch", "note": "optional", "category": "produce|protein|dairy|grains|pantry|frozen|other"}
+    ],
+    "macros": {"calories": int, "protein_g": int, "carbs_g": int, "fat_g": int}
+  }
+}"""
+
 # Which slots each day uses, derived from the member's meals-per-day preference.
 def slots_for(meals_per_day: str) -> List[str]:
     mapping = {
@@ -304,7 +338,41 @@ def slots_for(meals_per_day: str) -> List[str]:
     }
     return mapping.get(meals_per_day, ["breakfast", "lunch", "dinner"])
 
-def build_user_message(profile: ProfileDB, distinct_slots: List[str], liked_names: List[str]) -> str:
+# How many times a member has actually eaten vs. skipped each meal, across every
+# schedule they've ever had (not just the active one) — this is the signal that
+# lets regeneration improve as the app gets used, not just repeat the last plan.
+ADHERENCE_MIN_SAMPLES = 2  # ignore a meal until it's shown up at least this many times
+
+def build_adherence_summary(user_id: int, db: Session):
+    rows = (
+        db.query(MealDB.name, ScheduleEntryDB.status, func.count(ScheduleEntryDB.id))
+        .join(ScheduleEntryDB, ScheduleEntryDB.meal_id == MealDB.id)
+        .filter(MealDB.user_id == user_id)
+        .group_by(MealDB.name, ScheduleEntryDB.status)
+        .all()
+    )
+    counts = {}
+    for name, entry_status, count in rows:
+        bucket = counts.setdefault(name, {"completed": 0, "skipped": 0})
+        if entry_status in bucket:
+            bucket[entry_status] += count
+
+    finished_names, skipped_names = [], []
+    for name, c in counts.items():
+        total = c["completed"] + c["skipped"]
+        if total < ADHERENCE_MIN_SAMPLES:
+            continue
+        if c["completed"] > c["skipped"]:
+            finished_names.append(name)
+        elif c["skipped"] > c["completed"]:
+            skipped_names.append(name)
+    return finished_names, skipped_names
+
+def build_user_message(
+    profile: ProfileDB, distinct_slots: List[str], liked_names: List[str],
+    finished_names: Optional[List[str]] = None, skipped_names: Optional[List[str]] = None,
+    disliked_names: Optional[List[str]] = None,
+) -> str:
     allergies = load_allergies(profile)
     lines = [
         "Build a two-week nutrition plan for this member.",
@@ -322,10 +390,38 @@ def build_user_message(profile: ProfileDB, distinct_slots: List[str], liked_name
         f"For EACH slot above give {LIBRARY_PER_SLOT} distinct options (a rotation pool, not one meal per day).",
         f"Meals the member already liked (make some new options similar to these): {', '.join(liked_names) if liked_names else 'none yet'}",
     ]
+    if finished_names:
+        lines.append(f"Meals the member reliably finishes (favor more dishes like these): {', '.join(finished_names)}")
+    if skipped_names:
+        lines.append(f"Meals the member often skips (avoid repeating these; try different flavors or prep): {', '.join(skipped_names)}")
+    if disliked_names:
+        lines.append(f"Meals the member explicitly disliked and swapped out (never repeat, avoid similar dishes): {', '.join(disliked_names)}")
     if profile.daily_calorie_target:
         lines.append(f"Daily calorie target: {profile.daily_calorie_target} kcal")
     else:
         lines.append("Daily calorie target: estimate it from the info above")
+    if profile.nutrition_notes:
+        lines.append(f"Other notes: {profile.nutrition_notes}")
+    return "\n".join(lines)
+
+# Prompt for the "try another meal" swap — one meal, same slot, distinct from
+# whatever's already in that slot's rotation (and, for a full dislike, from the
+# meal being replaced).
+def build_replacement_message(profile: ProfileDB, slot: str, avoid_names: List[str], liked_names: List[str]) -> str:
+    allergies = load_allergies(profile)
+    lines = [
+        f"Give ONE replacement {slot} option for this member's rotation.",
+        "",
+        f"Diet pattern: {profile.diet_pattern}",
+        f"Macro focus: {profile.macro_focus}",
+        f"Allergies (ABSOLUTE — never include): {', '.join(allergies) if allergies else 'none'}",
+        f"Disliked foods: {profile.disliked_foods or 'none'}",
+        f"Favorite foods: {profile.favorite_foods or 'none'}",
+        f"Avoid repeating or closely resembling these meals already in the rotation: {', '.join(avoid_names) if avoid_names else 'none'}",
+        f"Meals the member already liked (make something in a similar spirit, but a distinct dish): {', '.join(liked_names) if liked_names else 'none yet'}",
+    ]
+    if profile.daily_calorie_target:
+        lines.append(f"Daily calorie target for the day: {profile.daily_calorie_target} kcal")
     if profile.nutrition_notes:
         lines.append(f"Other notes: {profile.nutrition_notes}")
     return "\n".join(lines)
@@ -481,6 +577,8 @@ def generate_schedule(replace: bool = False, user: UserDB = Depends(get_current_
     day_slots = slots_for(profile.meals_per_day)
     distinct_slots = list(dict.fromkeys(day_slots))  # de-duped, order preserved
     liked_names = [m.name for m in db.query(MealDB).filter(MealDB.user_id == user.id, MealDB.liked == True).all()]
+    disliked_names = [m.name for m in db.query(MealDB).filter(MealDB.user_id == user.id, MealDB.disliked == True).all()]
+    finished_names, skipped_names = build_adherence_summary(user.id, db)
 
     try:
         # Groq is OpenAI-compatible, so reuse the OpenAI client against its endpoint.
@@ -494,7 +592,10 @@ def generate_schedule(replace: bool = False, user: UserDB = Depends(get_current_
             response_format={"type": "json_object"},
             messages=[
                 {"role": "system", "content": NUTRITION_SYSTEM_PROMPT + "\n\n" + PLAN_JSON_SHAPE},
-                {"role": "user", "content": build_user_message(profile, distinct_slots, liked_names)},
+                {"role": "user", "content": build_user_message(
+                    profile, distinct_slots, liked_names,
+                    finished_names=finished_names, skipped_names=skipped_names, disliked_names=disliked_names,
+                )},
             ],
         )
         library = GeneratedLibrary.model_validate_json(response.choices[0].message.content)
@@ -575,6 +676,108 @@ def update_entry_status(entry_id: int, update: EntryStatusUpdate,
     entry.status = update.status
     db.commit()
     return {"entry_id": entry.id, "status": entry.status}
+
+# Favourite/unfavourite a meal. Liking clears any prior dislike signal on it —
+# feeds straight into build_user_message's liked_names for future generations.
+class MealLikedUpdate(BaseModel):
+    liked: bool
+
+@app.patch("/meals/{meal_id}/liked")
+def update_meal_liked(meal_id: int, update: MealLikedUpdate,
+                      user: UserDB = Depends(get_current_user), db: Session = Depends(get_db)):
+    meal = db.query(MealDB).filter(MealDB.id == meal_id, MealDB.user_id == user.id).first()
+    if meal is None:
+        raise HTTPException(status_code=404, detail="Meal not found.")
+    meal.liked = update.liked
+    if update.liked:
+        meal.disliked = False
+    db.commit()
+    return {"id": meal.id, "liked": meal.liked, "disliked": meal.disliked}
+
+# "Try another meal" — swap a single entry's meal, or every occurrence of it in
+# the active plan, for a freshly generated alternative in the same slot.
+class MealReplaceRequest(BaseModel):
+    scope: Literal["single", "all"] = "single"
+
+@app.post("/schedule/entries/{entry_id}/replace-meal")
+def replace_meal(entry_id: int, body: MealReplaceRequest,
+                 user: UserDB = Depends(get_current_user), db: Session = Depends(get_db)):
+    entry = (
+        db.query(ScheduleEntryDB)
+        .join(ScheduleDB, ScheduleEntryDB.schedule_id == ScheduleDB.id)
+        .filter(ScheduleEntryDB.id == entry_id, ScheduleDB.user_id == user.id)
+        .first()
+    )
+    if entry is None:
+        raise HTTPException(status_code=404, detail="Meal not found on your plan.")
+
+    old_meal = db.query(MealDB).filter(MealDB.id == entry.meal_id).first()
+    if old_meal is None:
+        raise HTTPException(status_code=404, detail="Original meal not found.")
+
+    schedule = db.query(ScheduleDB).filter(ScheduleDB.id == entry.schedule_id).first()
+    profile = get_or_create_profile(user, db)
+
+    # Meals already in this slot's rotation, so the LLM doesn't hand back a near-duplicate.
+    sibling_entries = db.query(ScheduleEntryDB).filter(
+        ScheduleEntryDB.schedule_id == schedule.id, ScheduleEntryDB.slot == old_meal.slot,
+    ).all()
+    sibling_meal_ids = {e.meal_id for e in sibling_entries}
+    sibling_meals = db.query(MealDB).filter(MealDB.id.in_(sibling_meal_ids)).all() if sibling_meal_ids else []
+    avoid_names = list(dict.fromkeys([m.name for m in sibling_meals]))
+
+    liked_names = [m.name for m in db.query(MealDB).filter(MealDB.user_id == user.id, MealDB.liked == True).all()]
+
+    try:
+        client = OpenAI(
+            base_url="https://api.groq.com/openai/v1",
+            api_key=os.environ.get("GROQ_API_KEY"),
+        )
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            temperature=0.7,
+            response_format={"type": "json_object"},
+            messages=[
+                {"role": "system", "content": NUTRITION_SYSTEM_PROMPT + "\n\n" + SINGLE_MEAL_JSON_SHAPE},
+                {"role": "user", "content": build_replacement_message(profile, old_meal.slot, avoid_names, liked_names)},
+            ],
+        )
+        gm = GenSingleMeal.model_validate_json(response.choices[0].message.content).meal
+    except Exception as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Could not find a replacement right now: {error}",
+        )
+
+    new_meal = MealDB(
+        user_id=user.id,
+        slot=gm.slot,
+        name=gm.name,
+        description=gm.description,
+        experimental=gm.experimental,
+        liked=False,
+        meal_json=json.dumps({
+            "items": [i.model_dump() for i in gm.items],
+            "macros": gm.macros.model_dump(),
+        }),
+    )
+    db.add(new_meal)
+    db.flush()
+
+    if body.scope == "all":
+        # Whole rotation gets the swap, and the old meal is flagged so future
+        # generations know to avoid it and anything like it.
+        db.query(ScheduleEntryDB).filter(
+            ScheduleEntryDB.schedule_id == schedule.id, ScheduleEntryDB.meal_id == old_meal.id,
+        ).update({"meal_id": new_meal.id})
+        old_meal.disliked = True
+        old_meal.liked = False
+    else:
+        # Just this one day/occurrence — the meal stays in rotation elsewhere.
+        entry.meal_id = new_meal.id
+
+    db.commit()
+    return load_active_schedule(user, db)
 
 # Past plans, newest first, so the member can recall what they ate.
 @app.get("/schedules")

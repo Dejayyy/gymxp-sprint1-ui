@@ -1,6 +1,6 @@
 import React, { useMemo, useEffect, useState } from "react";
 import {
-  Sparkles, Flame, RefreshCw, Salad, LogIn, Star, Check, X,
+  Sparkles, Flame, RefreshCw, Salad, LogIn, Star, Check, X, Heart,
   CalendarDays, ShoppingCart, Minus, Plus,
 } from "lucide-react";
 
@@ -83,12 +83,21 @@ function NutritionPage({ onShowLogin }) {
   const [shoppingError, setShoppingError] = useState("");
   const [checkedItems, setCheckedItems] = useState(() => new Set());
   const [expandedItems, setExpandedItems] = useState(() => new Set());
+  const [replaceChoiceFor, setReplaceChoiceFor] = useState(null); // entry_id showing the swap-scope choice
+  const [replacingEntryId, setReplacingEntryId] = useState(null); // entry_id currently mid-swap
 
   const openPlan = (data) => {
     setPlan(data);
     const o = todayOffset(data);
     setSelectedDay(o < 0 ? 0 : o);
     setShopping(null); // list is stale after a new plan
+  };
+
+  // For in-place edits (liked toggle aside) that change ingredients — swap-a-meal —
+  // without jumping the user away from the day they're looking at.
+  const updatePlan = (data) => {
+    setPlan(data);
+    setShopping(null); // ingredients may have changed
   };
 
   useEffect(() => {
@@ -248,6 +257,67 @@ function NutritionPage({ onShowLogin }) {
       if (!response.ok) patchLocal(previous);
     } catch (error) {
       patchLocal(previous);
+    }
+  };
+
+  // A meal (by meal_id) can appear on several days in the rotation, so liking it
+  // on one card should reflect everywhere it shows up — not just this entry.
+  const patchMealLiked = (mealId, liked) =>
+    setPlan((prev) => prev && ({
+      ...prev,
+      days: prev.days.map((d) => ({
+        ...d,
+        entries: d.entries.map((e) => (e.meal.id === mealId ? { ...e, meal: { ...e.meal, liked } } : e)),
+      })),
+    }));
+
+  const toggleLiked = async (meal) => {
+    const next = !meal.liked;
+    patchMealLiked(meal.id, next);
+    try {
+      const response = await fetch(`${API_BASE}/meals/${meal.id}/liked`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ liked: next }),
+      });
+      if (response.status === 401) {
+        localStorage.removeItem("userToken");
+        setStatus("unauthenticated");
+        return;
+      }
+      if (!response.ok) patchMealLiked(meal.id, !next);
+    } catch (error) {
+      patchMealLiked(meal.id, !next);
+    }
+  };
+
+  // "Try another meal" — scope "single" swaps just this occurrence, "all" swaps
+  // every day this meal appears on and flags it so future plans avoid it too.
+  const replaceMeal = async (entry, scope) => {
+    setReplaceChoiceFor(null);
+    setReplacingEntryId(entry.entry_id);
+    setErrorMessage("");
+    try {
+      const response = await fetch(`${API_BASE}/schedule/entries/${entry.entry_id}/replace-meal`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ scope }),
+      });
+      if (response.status === 401) {
+        localStorage.removeItem("userToken");
+        setStatus("unauthenticated");
+        return;
+      }
+      const data = await response.json();
+      if (response.ok) {
+        updatePlan(data);
+      } else {
+        setErrorMessage(data.detail || "Could not find a replacement. Try again.");
+      }
+    } catch (error) {
+      setErrorMessage("Cannot reach backend server. Is Uvicorn running on port 8000?");
+    } finally {
+      setReplacingEntryId(null);
     }
   };
 
@@ -442,7 +512,18 @@ function NutritionPage({ onShowLogin }) {
                           )}
                         </h3>
                       </div>
-                      <span className="mealKcal"><Flame size={16} /> {entry.meal.macros.calories} kcal</span>
+                      <div className="mealHeadActions">
+                        <button
+                          type="button"
+                          className={`likeBtn${entry.meal.liked ? " likeBtn--on" : ""}`}
+                          onClick={() => toggleLiked(entry.meal)}
+                          aria-pressed={entry.meal.liked}
+                          aria-label={entry.meal.liked ? "Unlike this meal" : "Like this meal"}
+                        >
+                          <Heart size={16} />
+                        </button>
+                        <span className="mealKcal"><Flame size={16} /> {entry.meal.macros.calories} kcal</span>
+                      </div>
                     </div>
 
                     {entry.meal.description && <p className="mealDesc">{entry.meal.description}</p>}
@@ -461,6 +542,31 @@ function NutritionPage({ onShowLogin }) {
                       <span>C {entry.meal.macros.carbs_g}g</span>
                       <span>F {entry.meal.macros.fat_g}g</span>
                     </div>
+
+                    {replaceChoiceFor === entry.entry_id ? (
+                      <div className="replaceChoice">
+                        <span>Swap this meal —</span>
+                        <button type="button" className="textButton" onClick={() => replaceMeal(entry, "single")}>
+                          Just today
+                        </button>
+                        <button type="button" className="textButton textButton--danger" onClick={() => replaceMeal(entry, "all")}>
+                          I dislike this one
+                        </button>
+                        <button type="button" className="textButton" onClick={() => setReplaceChoiceFor(null)}>
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        className="tryAnotherBtn"
+                        onClick={() => setReplaceChoiceFor(entry.entry_id)}
+                        disabled={replacingEntryId === entry.entry_id}
+                      >
+                        <RefreshCw size={15} />
+                        <span>{replacingEntryId === entry.entry_id ? "Finding a swap…" : "Try another"}</span>
+                      </button>
+                    )}
 
                     <div className="mealActions">
                       <button
