@@ -2,6 +2,8 @@ import { useState } from "react";
 import AuthPage from "./AuthPage";
 import ProfilePage from "./ProfilePage";
 import NutritionPage from "./NutritionPage";
+import WorkoutSuggestionsPage from "./WorkoutSuggestionsPage";
+import WorkoutSuggestionsPage2 from "./WorkoutSuggestionsPage2";
 
 import {
   Activity,
@@ -36,7 +38,7 @@ const goals = [
   ["Sleep score", "78", "recovery"],
 ];
 
-function Header({ activeView, onShowHome, onShowLogin, onShowProfile, onShowNutrition }) {
+function Header({ activeView, onShowHome, onShowLogin, onShowProfile, onShowNutrition, onShowWorkouts }) {
   return (
     <header className="topbar">
      <button className="brand brandButton" type="button" onClick={onShowHome}>
@@ -51,6 +53,13 @@ function Header({ activeView, onShowHome, onShowLogin, onShowProfile, onShowNutr
           onClick={onShowHome}
         >
           Today
+        </button>
+        <button
+          className={activeView === "workouts" ? "active" : ""}
+          type="button"
+          onClick={onShowWorkouts}
+        >
+          Workouts
         </button>
         <button type="button">Progress</button>
         <button
@@ -386,6 +395,7 @@ function App() {
   const showLogin = () => setActiveView("login");
   const showProfile = () => setActiveView("profile");
   const showNutrition = () => setActiveView("nutrition");
+  const showWorkouts = () => setActiveView("workouts");
 
   return (
     <main className="appShell">
@@ -395,6 +405,7 @@ function App() {
         onShowLogin={showLogin}
         onShowProfile={showProfile}
         onShowNutrition={showNutrition}
+        onShowWorkouts={showWorkouts}
       />
 
       {activeView === "login" ? (
@@ -404,6 +415,8 @@ function App() {
         <ProfilePage onShowLogin={showLogin} />
       ) : activeView === "nutrition" ? (
         <NutritionPage onShowLogin={showLogin} />
+      ) : activeView === "workouts" ? (
+        <WorkoutSuggestionsPage onShowLogin={showLogin}/>    
       ) : (
         <div className="dashboard">
           <div className="mainColumn">

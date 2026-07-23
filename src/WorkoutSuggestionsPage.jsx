@@ -1,4 +1,6 @@
-import React from "react";
+import React, { useState } from 'react';
+
+/* ------------------------------------------------------------------ */
 import {
   Activity,
   BrainCircuit,
@@ -12,63 +14,142 @@ import {
   Target,
 } from "lucide-react";
 
-const suggestions = [
+const API_BASE = "http://localhost:8000";
+function WorkoutSuggestionsPage({ onShowLogin }) {
+
+  const [user, setUser] = useState({user_id: 59});
+  //const [wo_data, setData] = useState(null);
+
+  const [prediction1, setPrediction1] = useState(["Awaiting", "Generation"]);
+  const [prediction2, setPrediction2] = useState(["Awaiting", "Generation"]);
+  const [prediction3, setPrediction3] = useState(["Awaiting", "Generation"]);
+
+  const [fName, setfName] = useState("Awaiting Generation");
+  const [lName, setlName] = useState("Awaiting Generation");
+  const [goal, setGoal] = useState("Awaiting Generation");
+  const [exp, setExp] = useState("Awaiting Generation");
+  const [con, setCon] = useState("Awaiting Generation");
+  const [recovery, setRecovery] = useState("Awaiting Generation")
+  const [equipment, setEquipment] = useState("Awaiting Generation")
+  const [time, setTime] = useState("Awaiting Generation")
+  const [time1, setTime1] = useState("Awaiting Generation")
+  const [time2, setTime2] =  useState("Awaiting Generation")
+  const [time3, setTime3]  = useState("Awaiting Generation")
+  const [focus1, setFocus1] =  useState("Awaiting Generation")
+  const [focus2, setFocus2]  = useState("Awaiting Generation")
+  const [wo_intensity, setIntensity]  = useState("Awaiting Generation")
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const suggestions = [
   {
-    title: "Upper Push Strength",
+    title: "Workout 1",
     match: "94%",
-    duration: "45 min",
-    intensity: "Moderate",
-    focus: "Chest, shoulders, triceps",
+    duration: time1,
+    intensity: wo_intensity,
+    focus: focus1 + " " + focus2,
     reason: "Best fit for your strength goal with low knee load and gym equipment available.",
-    moves: ["Dumbbell bench press", "Seated shoulder press", "Cable fly", "Rope pushdown"],
+    moves: prediction1,
     tone: "progression",
   },
   {
-    title: "Full Body Foundation",
+    title: "Workout 2",
     match: "88%",
-    duration: "40 min",
-    intensity: "Balanced",
-    focus: "Total body technique",
+    duration: time2,
+    intensity: wo_intensity,
+    focus: focus1 + " " + focus2,
     reason: "Keeps weekly volume moving while leaving recovery room after your last hard session.",
-    moves: ["Goblet squat", "Incline row", "Romanian deadlift", "Plank hold"],
+    moves: prediction2,
     tone: "consistency",
   },
   {
-    title: "Recovery Conditioning",
+    title: "Workout 3",
     match: "82%",
-    duration: "30 min",
-    intensity: "Light",
-    focus: "Mobility and cardio",
+    duration: time3,
+    intensity: wo_intensity,
+    focus: focus1 + " " + focus2,
     reason: "Useful when soreness is high or sleep drops below target.",
-    moves: ["Bike intervals", "Hip mobility", "Band pull-aparts", "Breathing cooldown"],
+    moves: prediction3,
     tone: "recovery",
   },
-];
+  ];
 
-const modelInputs = [
-  ["Goal", "Lean muscle"],
-  ["Experience", "Beginner"],
-  ["Equipment", "Home + gym"],
-  ["Session", "45 min"],
-  ["Constraints", "Knee friendly"],
-  ["Recovery", "Moderate"],
-];
+  const modelInputs = [
+  ["Goal", goal],
+  ["Experience", exp],
+  ["Equipment", equipment],
+  ["Session", time],
+  ["Constraints", con],
+  ["Recovery", recovery],
+  ];
 
-function WorkoutSuggestionsPage() {
+  const handleChange = (e) => {
+    setUser({ ...user, [e.target.name]: parseInt(e.target.value) || 0 });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`${API_BASE}/predict-workout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(user),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Server returned status code: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log(result);
+      //setPrediction(result);
+      setPrediction1(result.wo1);
+      setPrediction2(result.wo2);
+      setPrediction3(result.wo3);
+      
+      setfName(result.first_name);
+      setlName(result.last_name);
+      setGoal(result.goal);
+      setExp(result.experience_level);
+      setCon(result.constraints);
+      setRecovery(result.recovery);
+      setEquipment(result.equipment);
+      setTime(result.time);
+      setTime1(result.time1);
+      setTime2(result.time2);
+      setTime3(result.time3);
+      setFocus1(result.focus1);
+      setFocus2(result.focus2);
+      setIntensity(result.wo_intensity);
+
+    } catch (err) {
+      setError(err.message || "Failed to communicate with the ML server.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="workoutSuggestionsPage">
       <section className="panel suggestionsHero">
         <div className="suggestionsHeroText">
           <p className="eyebrow">ML workout suggestions</p>
           <h1>Recommended sessions for your next workout</h1>
-          <p>
-            This page is ready for the model output. For now, the interface shows
-            polished sample recommendations based on profile, equipment, goals,
-            and recent training feedback.
-          </p>
-
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            <label>
+              User ID:
+              <input type="number" name="user_id" value={user.user_id} onChange={handleChange} style={{ width: '100%', padding: '8px' }} />
+            </label>
+            <button type="submit" disabled={loading} style={{ padding: '10px', cursor: 'pointer', background: '#007BFF', color: '#fff', border: 'none' }}>
+              {loading ? 'Calculating...' : 'Workout Suggestion'}
+            </button>
+          </form>
           <div className="actionRow">
-            <button className="primaryBtn" type="button">
+            <button className="primaryBtn" type="button" onClick={handleSubmit}>
               <Sparkles size={18} />
               <span>Use top suggestion</span>
             </button>
@@ -76,17 +157,6 @@ function WorkoutSuggestionsPage() {
               <RefreshCw size={18} />
               <span>Refresh</span>
             </button>
-          </div>
-        </div>
-
-        <div className="modelCard" aria-label="Model readiness">
-          <span className="modelIcon">
-            <BrainCircuit size={28} />
-          </span>
-          <strong>Model endpoint pending</strong>
-          <div className="modelScore">
-            <span>Confidence preview</span>
-            <b>94%</b>
           </div>
         </div>
       </section>

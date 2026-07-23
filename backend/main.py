@@ -7,14 +7,26 @@ from sqlalchemy.orm import sessionmaker, Session
 from datetime import datetime, timedelta, date
 from typing import Optional, List, Literal
 from pydantic import BaseModel, ConfigDict
+import pandas as pd
+import torch
+import math
+import torch.nn as nn
+import numpy as np
+#from model_pretrain import WorkoutNet
 import os
 import json
+import random
 import bcrypt
 import jwt
 
 from openai import OpenAI
 from dotenv import load_dotenv
 load_dotenv()
+
+# Define input to model --------------
+class PredictionInput(BaseModel):
+    user_id: int
+# ------------------------------------
 
 # --- 1. DATABASE CONFIGURATION ---
 DATABASE_URL = "sqlite:///./workout_demo.db"
@@ -289,7 +301,8 @@ app = FastAPI()
 # Configured exactly once so all endpoints below are accessible by the React app
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows your Vite frontend port to connect seamlessly
+    #allow_origins=["*"],  # Allows your Vite frontend port to connect seamlessly
+    allow_origins=["http://localhost:5173", "http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -399,3 +412,146 @@ def get_nutrition_plan(user: UserDB = Depends(get_current_user), db: Session = D
 @app.get("/protected-profile")
 def get_profile(user: UserDB = Depends(get_current_user)):
     return {"message": f"Welcome back, {user.email}! This is your private health data."}
+
+# Start the model definition -------------------------------------------------------------------------------------
+# Define the expected JSON data structure from the frontend
+@app.get("/")
+def home():
+    return {"status": "API is online and serving models"}
+
+@app.post("/predict-workout")
+def predict_workout(data: PredictionInput):
+    # Extract data fields safely validated by Pydantic
+    user_id = data.user_id
+
+    # Model definition v -----------------------------------------------------------
+    # Define the device
+    # Define the device
+    device = 'cpu'
+    user_id = 59
+
+    # Define the model
+    class WorkoutNet(nn.Module):
+        def __init__(self):
+            super(WorkoutNet, self).__init__()
+            # Encoding Layers
+            self.fc1 = nn.Linear(42, 64, device=device)
+            self.fc2 = nn.Linear(64, 32, device=device)
+
+            # Output Layer
+            self.fc6 = nn.Linear(32, 1003, device=device)
+
+            # Regularization layers
+            self.dropout = nn.Dropout(p=0.3)
+
+        def forward(self, x):
+            x = torch.relu(self.fc1(x))
+            x = self.dropout(x)
+            x = torch.relu(self.fc2(x))
+            x = self.dropout(x)
+            x = self.fc6(x)
+
+            # Return output for training and logits layer
+            return torch.sigmoid(x), x
+
+    # Initialize the model
+    model = WorkoutNet().to(device)
+    state_dict = torch.load("final_model.pth", weights_only=True, map_location=torch.device('cpu'))    
+    model.load_state_dict(state_dict)
+    model.eval()
+    # Model definition ^ -----------------------------------------------------------
+
+    # Importing data v -------------------------------------------------------------
+    user_data = pd.read_csv('./data/test_data.csv', header = None)
+    user_data_init = pd.read_csv('./data/test_data_init.csv')
+    exercise_list = pd.read_csv('./data/exercise_list.csv')
+
+    # Individual user data
+    wo_history = pd.read_csv('./data/wo_history.csv', header=None)
+    wo_liked = pd.read_csv('./data/wo_liked.csv', header= None)
+
+    # Importing data ^ -------------------------------------------------------------
+
+    # Testing model on a specific user
+    user_data_specific = torch.tensor(user_data.iloc[user_id].to_list())
+    _, weights = model(user_data_specific)
+
+    logits = weights.detach().cpu()
+
+    # Preference algorithm
+    # Recency + Liked wrt age
+    def recency_calc(wo_hist, wo_liked, cust):
+        scaled_workouts = []
+        for i, days in enumerate(wo_hist):
+            if days == 0:
+                scaled_workouts.append(wo_liked[i]*0.2 + math.sqrt(cust['age']/2) / (4*(days+1e6)))
+            else:
+                scaled_workouts.append(wo_liked[i]*0.2 + math.sqrt(cust['age']/2) / (4*days))
+        return scaled_workouts
+
+    logit_mod = recency_calc(wo_history, wo_liked, user_data_init.iloc[59])
+
+    new_logits = logits - torch.tensor(logit_mod)
+    pred = np.array(torch.sigmoid(new_logits).numpy() > 0.25, dtype = float)[0]
+
+    wo_suggestion = []
+    for i, p in enumerate(pred):
+        if p == 1.0:
+            wo_suggestion.append(exercise_list.iloc[i]['0'])
+
+    # Time commitment allocation
+    # Assume each exercise takes ~ 10 mins
+    max_time = user_data_init.iloc[user_id]['time_commitment']
+    if max_time < 0.5:
+        max_time = 0.5
+    time_commitment = max_time*60
+    num_exercises = int((time_commitment) / 10)
+
+    exercise_length = []
+    for i in range(3):
+        exercise_length.append(random.randint(0,2))
+
+    if num_exercises < 3:
+        num_exercises = 3
+
+    # Recovery Suggestion
+    if user_data_init.iloc[user_id]['history'] >= 10:
+        recovery_suggestion = 'High'
+    elif 5<= user_data_init.iloc[user_id]['history'] < 10:
+        recovery_suggestion = 'Moderate'
+    else:
+        recovery_suggestion = 'Low'
+
+    # Workout intensity
+    num = random.randint(1,10)
+    if recovery_suggestion == 'Low':
+        if num < 4:
+            intensity = 'High'
+        else:
+            intensity = 'Moderate'
+    elif recovery_suggestion == 'High':
+        if num < 3:
+            intensity = 'Low'
+        else:
+            intensity = 'Moderate'
+    else:
+        intensity = 'Balanced'
+
+    return {
+        "first_name": user_data_init.iloc[user_id]['first_name'],
+         "last_name": user_data_init.iloc[user_id]['last_name'],
+         "goal": user_data_init.iloc[user_id]['goals'],
+         "experience_level": user_data_init.iloc[user_id]['experience_level'],
+         "constraints": 'None',
+         "recovery": recovery_suggestion,
+         "equipment": user_data_init.iloc[user_id]['equipment'],
+         "time": str(round(time_commitment)/4),
+         "time1": str(round(time_commitment-(exercise_length[0]*10))/4)+ " mins",
+         "time2": str(round(time_commitment-(exercise_length[1]*10))/4)+ " mins",
+         "time3": str(round(time_commitment-(exercise_length[2]*10))/4) + " mins",
+         "focus1": user_data_init.iloc[user_id]['bodypart1'],
+         "focus2": user_data_init.iloc[user_id]['bodypart2'],
+         "wo_intensity": intensity,
+         "wo1": random.sample(wo_suggestion,num_exercises-exercise_length[0]),
+         "wo2": random.sample(wo_suggestion,num_exercises-exercise_length[1]),
+         "wo3": random.sample(wo_suggestion,num_exercises-exercise_length[2])}
