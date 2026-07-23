@@ -983,6 +983,66 @@ button {
   border-color: #f3b7ab;
 }
 
+/* Survey chips (proteins/cuisines) are a positive pick, not a warning like
+   allergies, so they get the mint "on" state instead of the red one. */
+.chip--protein.chip--on {
+  color: #205449;
+  background: var(--mint-soft);
+  border-color: var(--mint);
+}
+
+.surveyIntro {
+  max-width: 640px;
+  margin: 0 0 16px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+/* Three selectable cards for how much repetition the member is okay with. */
+.varietyOptions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.varietyCard {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfa;
+  text-align: left;
+  cursor: pointer;
+}
+
+.varietyCard strong {
+  font-size: 0.92rem;
+}
+
+.varietyCard span {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.varietyCard--on {
+  border-color: var(--mint);
+  background: var(--mint-soft);
+  box-shadow: inset 0 0 0 1px var(--mint);
+}
+
+.varietyCard--on strong {
+  color: #205449;
+}
+
+@media (max-width: 700px) {
+  .varietyOptions {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Nutrition plan page */
 .nutritionPage {
   display: grid;

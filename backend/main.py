@@ -6,7 +6,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from datetime import datetime, timedelta, date
 from typing import Optional, List, Literal
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator, ValidationError
 import os
 import json
 import bcrypt
@@ -54,6 +54,11 @@ class ProfileDB(Base):
     meals_per_day = Column(String, default="3")     # "3" / "4" / "5" / "Intermittent fasting"
     daily_calorie_target = Column(Integer, nullable=True)  # null = let the model compute
     nutrition_notes = Column(String, default="")
+
+    # --- meal variety survey (gives the LLM real signal instead of a blank profile) ---
+    preferred_proteins = Column(Text, default="[]")   # JSON array of strings
+    favorite_cuisines = Column(Text, default="[]")     # JSON array of strings
+    variety_preference = Column(String, default="balanced")  # repeat_ok / balanced / new_daily
 
 # Meals live in their own table so they can be liked, reused, and dragged around the calendar later.
 class MealDB(Base):
@@ -104,6 +109,9 @@ def _ensure_column(table: str, column: str, ddl: str):
             conn.commit()
 
 _ensure_column("meals", "disliked", "disliked BOOLEAN DEFAULT 0")
+_ensure_column("profiles", "preferred_proteins", "preferred_proteins TEXT DEFAULT '[]'")
+_ensure_column("profiles", "favorite_cuisines", "favorite_cuisines TEXT DEFAULT '[]'")
+_ensure_column("profiles", "variety_preference", "variety_preference VARCHAR DEFAULT 'balanced'")
 
 
 # --- 2. SECURITY CONFIGURATION ---
@@ -171,12 +179,18 @@ class ProfileUpdate(BaseModel):
     meals_per_day: Optional[str] = None
     daily_calorie_target: Optional[int] = None
     nutrition_notes: Optional[str] = None
+    preferred_proteins: Optional[List[str]] = None
+    favorite_cuisines: Optional[List[str]] = None
+    variety_preference: Optional[str] = None
 
-def load_allergies(profile: ProfileDB) -> List[str]:
+def load_json_list(raw: Optional[str]) -> List[str]:
     try:
-        return json.loads(profile.allergies or "[]")
+        return json.loads(raw or "[]")
     except (json.JSONDecodeError, TypeError):
         return []
+
+def load_allergies(profile: ProfileDB) -> List[str]:
+    return load_json_list(profile.allergies)
 
 def serialize_profile(user: UserDB, profile: ProfileDB) -> dict:
     return {
@@ -199,6 +213,9 @@ def serialize_profile(user: UserDB, profile: ProfileDB) -> dict:
         "meals_per_day": profile.meals_per_day,
         "daily_calorie_target": profile.daily_calorie_target,
         "nutrition_notes": profile.nutrition_notes or "",
+        "preferred_proteins": load_json_list(profile.preferred_proteins),
+        "favorite_cuisines": load_json_list(profile.favorite_cuisines),
+        "variety_preference": profile.variety_preference or "balanced",
     }
 
 def get_or_create_profile(user: UserDB, db: Session) -> ProfileDB:
@@ -272,9 +289,56 @@ class GenSingleMeal(BaseModel):
     model_config = ConfigDict(extra="forbid")
     meal: GenMeal
 
+# A large library (many meals per slot, each with several ingredients) is a big
+# JSON response, and it only takes one truncated or malformed meal object for
+# strict whole-payload validation to throw the entire plan away. Instead: keep
+# whatever meals ARE valid and only fail outright if none of them are.
+def parse_generated_library(raw_json: str) -> GeneratedLibrary:
+    try:
+        return GeneratedLibrary.model_validate_json(raw_json)
+    except ValidationError:
+        pass  # fall through and salvage what we can, below
+
+    data = json.loads(raw_json)  # if the JSON itself is broken, this raises and we give up
+    valid_meals = []
+    for raw_meal in data.get("meals", []):
+        try:
+            valid_meals.append(GenMeal.model_validate(raw_meal))
+        except ValidationError:
+            continue  # drop this one malformed meal, keep the rest of the plan
+    if not valid_meals:
+        raise ValueError("The model's response didn't contain any usable meals.")
+
+    return GeneratedLibrary(
+        summary=data["summary"],
+        targets=GenTargets.model_validate(data["targets"]),
+        meals=valid_meals,
+    )
+
 # --- 6. PROMPT BUILDING ---
-LIBRARY_PER_SLOT = 4   # distinct options per slot to rotate over two weeks
 SCHEDULE_LENGTH = 14
+
+# How many distinct options to generate per meal slot for the two-week rotation.
+# A fixed small pool (the old default was 4) guarantees repeats every few days
+# regardless of anything else — this is the single biggest lever on variety.
+# Kept modest: each option is a full meal object (name, description, several
+# ingredients, macros), and asking for too many in one response risks the
+# model truncating or dropping a field partway through.
+LIBRARY_SIZE_BY_VARIETY = {
+    "repeat_ok": 4,     # member said simpler shopping/prep matters more than novelty
+    "balanced": 6,
+    "new_daily": 8,
+}
+
+# Hard ceiling on slots * library_size — a member with 4 daily slots (e.g.
+# breakfast/lunch/dinner/snack) requesting "max variety" would otherwise ask
+# for 32 full meal objects in one response.
+MAX_TOTAL_LIBRARY_MEALS = 24
+
+def library_size_for(variety_preference: Optional[str], distinct_slot_count: int = 1) -> int:
+    size = LIBRARY_SIZE_BY_VARIETY.get(variety_preference, LIBRARY_SIZE_BY_VARIETY["balanced"])
+    distinct_slot_count = max(1, distinct_slot_count)
+    return max(2, min(size, MAX_TOTAL_LIBRARY_MEALS // distinct_slot_count))
 
 NUTRITION_SYSTEM_PROMPT = """You are GymXP's nutrition coach. You build a two-week eating plan that fits the member's goal and training.
 
@@ -283,6 +347,7 @@ Rules you must always follow:
 - Respect the member's diet pattern (e.g. vegan, halal) exactly.
 - Avoid disliked foods; favor the foods they enjoy.
 - Return a LIBRARY of meals to rotate across the two weeks, NOT one unique meal per day. For each requested slot, give the requested number of distinct options. Repetition across days is expected and helps the member buy and prep in bulk.
+- Within a single slot's options, maximize variety: don't let one primary protein (e.g. chicken breast) appear in more than about half of that slot's options, and vary cooking style and cuisine (grilled, roasted, stir-fried, braised, cold-prep; Italian, Mexican, Mediterranean, Asian, etc.) rather than defaulting to the same safe preparation repeatedly. This applies even when the member hasn't stated strong preferences — a thin profile is not a reason to play it safe with the same 1-2 proteins.
 - Every item must have a numeric quantity and a simple unit so ingredients can be summed into a shopping list. Use canonical ingredient names ("chicken breast", not "grilled chicken breast strips").
 - Tag every item with the grocery aisle category it belongs to (produce, protein, dairy, grains, pantry, frozen, other) so the shopping list can be grouped by aisle.
 - Each meal's macros should be sensible for its slot; a full day of meals should sum to roughly the daily targets.
@@ -368,12 +433,22 @@ def build_adherence_summary(user_id: int, db: Session):
             skipped_names.append(name)
     return finished_names, skipped_names
 
+VARIETY_INSTRUCTIONS = {
+    "repeat_ok": "The member is fine with meals repeating across the two weeks — simpler shopping and prep matters more to them than novelty. A small rotation pool is fine.",
+    "balanced": "The member wants a reasonable mix of familiar and new meals across the two weeks.",
+    "new_daily": "The member wants maximum variety — avoid repeating the same meal more than twice across the two weeks if possible.",
+}
+
 def build_user_message(
     profile: ProfileDB, distinct_slots: List[str], liked_names: List[str],
     finished_names: Optional[List[str]] = None, skipped_names: Optional[List[str]] = None,
-    disliked_names: Optional[List[str]] = None,
+    disliked_names: Optional[List[str]] = None, library_size: int = 8,
 ) -> str:
     allergies = load_allergies(profile)
+    preferred_proteins = load_json_list(profile.preferred_proteins)
+    favorite_cuisines = load_json_list(profile.favorite_cuisines)
+    variety_preference = profile.variety_preference or "balanced"
+
     lines = [
         "Build a two-week nutrition plan for this member.",
         "",
@@ -386,10 +461,24 @@ def build_user_message(
         f"Allergies (ABSOLUTE — never include): {', '.join(allergies) if allergies else 'none'}",
         f"Disliked foods: {profile.disliked_foods or 'none'}",
         f"Favorite foods: {profile.favorite_foods or 'none'}",
+        f"Preferred proteins to feature: {', '.join(preferred_proteins) if preferred_proteins else 'no preference stated — see variety note below'}",
+        f"Favorite cuisines to draw from: {', '.join(favorite_cuisines) if favorite_cuisines else 'no preference stated — use a broad mix'}",
+        VARIETY_INSTRUCTIONS.get(variety_preference, VARIETY_INSTRUCTIONS["balanced"]),
         f"Meal slots to cover: {', '.join(distinct_slots)}",
-        f"For EACH slot above give {LIBRARY_PER_SLOT} distinct options (a rotation pool, not one meal per day).",
+        f"For EACH slot above give {library_size} distinct options (a rotation pool, not one meal per day).",
         f"Meals the member already liked (make some new options similar to these): {', '.join(liked_names) if liked_names else 'none yet'}",
     ]
+
+    # Cold start: an all-blank profile is exactly when the model tends to fall
+    # back on the same 1-2 "safe" proteins — push it toward range instead.
+    if not (profile.favorite_foods or profile.disliked_foods or profile.nutrition_notes
+            or preferred_proteins or favorite_cuisines):
+        lines.append(
+            "The member hasn't shared specific food preferences yet — this is a great chance to "
+            "showcase a wide range of proteins (poultry, red meat, fish/seafood, eggs, plant-based) "
+            "and cuisines across the options, rather than defaulting to the same 1-2 proteins repeatedly."
+        )
+
     if finished_names:
         lines.append(f"Meals the member reliably finishes (favor more dishes like these): {', '.join(finished_names)}")
     if skipped_names:
@@ -553,9 +642,10 @@ def read_profile(user: UserDB = Depends(get_current_user), db: Session = Depends
 def update_profile(updates: ProfileUpdate, user: UserDB = Depends(get_current_user), db: Session = Depends(get_db)):
     profile = get_or_create_profile(user, db)
     changes = updates.model_dump(exclude_unset=True)
-    # allergies is JSON text, so set it separately.
-    if "allergies" in changes:
-        profile.allergies = json.dumps(changes.pop("allergies"))
+    # These three are stored as JSON text, so set them separately.
+    for list_field in ("allergies", "preferred_proteins", "favorite_cuisines"):
+        if list_field in changes:
+            setattr(profile, list_field, json.dumps(changes.pop(list_field)))
     for field, value in changes.items():
         setattr(profile, field, value)
     db.commit()
@@ -579,6 +669,7 @@ def generate_schedule(replace: bool = False, user: UserDB = Depends(get_current_
     liked_names = [m.name for m in db.query(MealDB).filter(MealDB.user_id == user.id, MealDB.liked == True).all()]
     disliked_names = [m.name for m in db.query(MealDB).filter(MealDB.user_id == user.id, MealDB.disliked == True).all()]
     finished_names, skipped_names = build_adherence_summary(user.id, db)
+    library_size = library_size_for(profile.variety_preference, len(distinct_slots))
 
     try:
         # Groq is OpenAI-compatible, so reuse the OpenAI client against its endpoint.
@@ -589,16 +680,18 @@ def generate_schedule(replace: bool = False, user: UserDB = Depends(get_current_
         response = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             temperature=0.6,
+            max_tokens=8000,  # a full library (up to MAX_TOTAL_LIBRARY_MEALS meals) needs real headroom
             response_format={"type": "json_object"},
             messages=[
                 {"role": "system", "content": NUTRITION_SYSTEM_PROMPT + "\n\n" + PLAN_JSON_SHAPE},
                 {"role": "user", "content": build_user_message(
                     profile, distinct_slots, liked_names,
                     finished_names=finished_names, skipped_names=skipped_names, disliked_names=disliked_names,
+                    library_size=library_size,
                 )},
             ],
         )
-        library = GeneratedLibrary.model_validate_json(response.choices[0].message.content)
+        library = parse_generated_library(response.choices[0].message.content)
     except Exception as error:
         # Missing key, network failure, or a bad model response.
         raise HTTPException(
@@ -736,6 +829,7 @@ def replace_meal(entry_id: int, body: MealReplaceRequest,
         response = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             temperature=0.7,
+            max_tokens=1500,  # one meal object — small, but leaves headroom over the default
             response_format={"type": "json_object"},
             messages=[
                 {"role": "system", "content": NUTRITION_SYSTEM_PROMPT + "\n\n" + SINGLE_MEAL_JSON_SHAPE},

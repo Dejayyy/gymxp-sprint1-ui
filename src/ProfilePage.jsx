@@ -37,6 +37,19 @@ const MACRO_FOCUS = ["Balanced", "High protein", "Low carb", "High carb", "Custo
 const MEALS_PER_DAY = ["3", "4", "5", "Intermittent fasting"];
 const COMMON_ALLERGENS = ["Nuts", "Dairy", "Gluten", "Shellfish", "Eggs", "Soy", "Fish"];
 
+// --- meal variety survey options ---
+const PROTEIN_OPTIONS = [
+  "Chicken", "Turkey", "Beef", "Pork", "Fish & seafood", "Eggs", "Tofu & plant-based", "Dairy-based",
+];
+const CUISINE_OPTIONS = [
+  "Italian", "Mexican", "Mediterranean", "Asian", "American", "Indian", "Middle Eastern", "Latin American",
+];
+const VARIETY_OPTIONS = [
+  { value: "repeat_ok", label: "Repeat is fine", helper: "Simpler shopping & prep matters more than novelty" },
+  { value: "balanced", label: "Balanced mix", helper: "Some repeats across two weeks is fine" },
+  { value: "new_daily", label: "Max variety", helper: "Show me something new as often as possible" },
+];
+
 // Keeps numeric inputs controlled without throwing NaN into React state.
 function toNumberOrNull(value) {
   if (value === "" || value === null || value === undefined) return null;
@@ -91,14 +104,17 @@ function ProfilePage({ onShowLogin }) {
     setSuccessMessage("");
   };
 
-  const toggleAllergen = (name) => {
+  // Generic toggle for any multi-select chip field (allergies, preferred proteins, cuisines...).
+  const toggleListField = (field, value) => {
     setForm((prev) => {
-      const set = new Set(prev.allergies || []);
-      set.has(name) ? set.delete(name) : set.add(name);
-      return { ...prev, allergies: [...set] };
+      const set = new Set(prev[field] || []);
+      set.has(value) ? set.delete(value) : set.add(value);
+      return { ...prev, [field]: [...set] };
     });
     setSuccessMessage("");
   };
+
+  const toggleAllergen = (name) => toggleListField("allergies", name);
 
   const addCustomAllergen = () => {
     const value = customAllergen.trim();
@@ -136,6 +152,8 @@ function ProfilePage({ onShowLogin }) {
       days_per_week: toNumberOrNull(editable.days_per_week),
       daily_calorie_target: toNumberOrNull(editable.daily_calorie_target),
       allergies: editable.allergies || [],
+      preferred_proteins: editable.preferred_proteins || [],
+      favorite_cuisines: editable.favorite_cuisines || [],
     };
 
     try {
@@ -438,6 +456,69 @@ function ProfilePage({ onShowLogin }) {
             <textarea rows={3} placeholder="e.g. Lactose intolerant but fine with hard cheese; I travel on Tuesdays"
               value={form.nutrition_notes ?? ""} onChange={(e) => updateField("nutrition_notes", e.target.value)} />
           </span>
+        </label>
+      </section>
+
+      <section className="panel">
+        <div className="sectionTitle profileSection">
+          <h2>Meal variety survey</h2>
+          <span>Helps generation avoid repeats</span>
+        </div>
+        <p className="surveyIntro">
+          The more we know about what you actually like, the less your plan leans on the same
+          "safe" chicken-and-rice defaults. Pick as many as apply — none of this is required.
+        </p>
+
+        <label className="fieldGroup profileWide">
+          <span>Proteins you'd like to see more of</span>
+          <div className="chipGroup">
+            {PROTEIN_OPTIONS.map((name) => {
+              const on = (form.preferred_proteins || []).includes(name);
+              return (
+                <button key={name} type="button"
+                  className={`chip chip--protein ${on ? "chip--on" : ""}`}
+                  aria-pressed={on}
+                  onClick={() => toggleListField("preferred_proteins", name)}>
+                  {name}
+                </button>
+              );
+            })}
+          </div>
+        </label>
+
+        <label className="fieldGroup profileWide">
+          <span>Cuisines you enjoy</span>
+          <div className="chipGroup">
+            {CUISINE_OPTIONS.map((name) => {
+              const on = (form.favorite_cuisines || []).includes(name);
+              return (
+                <button key={name} type="button"
+                  className={`chip chip--protein ${on ? "chip--on" : ""}`}
+                  aria-pressed={on}
+                  onClick={() => toggleListField("favorite_cuisines", name)}>
+                  {name}
+                </button>
+              );
+            })}
+          </div>
+        </label>
+
+        <label className="fieldGroup profileWide">
+          <span>How much variety do you want across two weeks?</span>
+          <div className="varietyOptions">
+            {VARIETY_OPTIONS.map((opt) => {
+              const on = (form.variety_preference ?? "balanced") === opt.value;
+              return (
+                <button key={opt.value} type="button"
+                  className={`varietyCard ${on ? "varietyCard--on" : ""}`}
+                  aria-pressed={on}
+                  onClick={() => updateField("variety_preference", opt.value)}>
+                  <strong>{opt.label}</strong>
+                  <span>{opt.helper}</span>
+                </button>
+              );
+            })}
+          </div>
         </label>
 
         <div className="actionRow">
